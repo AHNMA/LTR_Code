@@ -1,8 +1,9 @@
 
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../services/db';
 import { Post, PostSection } from '../types';
+import { syncService } from '../services/sync';
 
 interface PostContextType {
   posts: Post[];
@@ -16,23 +17,42 @@ interface PostContextType {
 const PostContext = createContext<PostContextType | undefined>(undefined);
 
 export const PostProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Fetch from DB sorted by date/id usually
-  const posts = useLiveQuery(() => db.posts.toArray(), []) || [];
+  const [postVersion, setPostVersion] = useState(0);
+  const forceUpdate = () => setPostVersion(v => v + 1);
+
+  // postVersion as dependency ensures hook re-runs when we manually trigger it
+  const posts = useLiveQuery(() => db.posts.toArray(), [postVersion]) || [];
 
   const getPostsBySection = (section: PostSection) => {
-    return posts.filter(post => post.section === section);
+    // Only return published posts for the frontend sections
+    return posts.filter(post => {
+        if (post.status !== 'published') return false;
+        
+        // Handle both new array format and legacy string format
+        if (Array.isArray(post.section)) {
+            return post.section.includes(section);
+        } else {
+            return post.section === section;
+        }
+    });
   };
 
   const addPost = async (post: Post) => {
     await db.posts.add(post);
+    forceUpdate();
+    syncService.autoPush();
   };
 
   const updatePost = async (updatedPost: Post) => {
     await db.posts.put(updatedPost);
+    forceUpdate();
+    syncService.autoPush();
   };
 
   const deletePost = async (id: string) => {
     await db.posts.delete(id);
+    forceUpdate();
+    syncService.autoPush();
   };
 
   const getPost = (id: string) => {
@@ -48,8 +68,6 @@ export const PostProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const usePosts = () => {
   const context = useContext(PostContext);
-  if (context === undefined) {
-    throw new Error('usePosts must be used within a PostProvider');
-  }
+  if (context === undefined) throw new Error('usePosts must be used within a PostProvider');
   return context;
 };

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { PostProvider } from './contexts/PostContext';
 import { DataProvider } from './contexts/DataContext';
@@ -6,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PredictionProvider } from './contexts/PredictionContext';
 import { NavigationProvider, useNavigation } from './contexts/NavigationContext';
 import { db } from './services/db';
+import { syncService } from './services/sync';
 import { INITIAL_USERS, INITIAL_TEAMS, INITIAL_DRIVERS, INITIAL_RACES, INITIAL_MEDIA } from './services/initialData';
 import { INITIAL_POSTS } from './constants';
 import Header from './components/Header';
@@ -28,25 +28,19 @@ import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
 import UserProfilePage from './components/profile/UserProfilePage';
 import PredictionPage from './components/pages/PredictionPage';
 
-// Robust Seeding Logic using Transactions
 const seedDatabase = async () => {
     try {
         await db.transaction('rw', db.users, db.posts, db.teams, db.drivers, db.races, db.media, async () => {
             const usersCount = await db.users.count();
             if (usersCount === 0) await db.users.bulkAdd(INITIAL_USERS);
-
             const postsCount = await db.posts.count();
             if (postsCount === 0) await db.posts.bulkAdd(INITIAL_POSTS);
-
             const teamsCount = await db.teams.count();
             if (teamsCount === 0) await db.teams.bulkAdd(INITIAL_TEAMS);
-
             const driversCount = await db.drivers.count();
             if (driversCount === 0) await db.drivers.bulkAdd(INITIAL_DRIVERS);
-
             const racesCount = await db.races.count();
             if (racesCount === 0) await db.races.bulkAdd(INITIAL_RACES);
-
             const mediaCount = await db.media.count();
             if (mediaCount === 0) await db.media.bulkAdd(INITIAL_MEDIA);
         });
@@ -58,27 +52,21 @@ const seedDatabase = async () => {
 function AppContent() {
   const { currentView, goToHome } = useNavigation();
   const { canAccessAdmin } = useAuth();
-
-  // Admin Route Protection
   if (currentView === 'admin') {
       if (!canAccessAdmin) {
-          // If user doesn't have permissions, redirect home immediately
           setTimeout(() => goToHome(), 0);
           return null; 
       }
       return <AdminDashboard onExit={goToHome} />;
   }
-
-  // Full Page Auth Views
   if (currentView === 'login') return <LoginPage />;
   if (currentView === 'register') return <RegisterPage />;
   if (currentView === 'forgot-password') return <ForgotPasswordPage />;
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col">
+    <div className="min-h-screen bg-f1-dark font-sans flex flex-col">
       <Header />
       <DriverTicker />
-      
       <main className="flex-grow pt-4">
         {currentView === 'article' && <ArticlePage />}
         {currentView === 'team-detail' && <TeamDetailPage />}
@@ -88,19 +76,20 @@ function AppContent() {
         {currentView === 'standings' && <StandingsPage />}
         {currentView === 'profile' && <UserProfilePage />}
         {currentView === 'prediction' && <PredictionPage />}
-        
         {currentView === 'home' && (
           <>
             <HeroSection />
-            <div className="container mx-auto px-4 mt-8 mb-4">
-                 <SectionTitle title="AUSGEWÄHLT" />
+            <div className="container mx-auto px-4 mt-12 mb-4">
+                 <SectionTitle title="Editor's Pick: Ausgewählt" />
             </div>
             <FeaturedGrid />
+            <div className="container mx-auto px-4 mt-12 mb-8">
+                 <SectionTitle title="Aktueller News Feed" />
+            </div>
             <NewsFeed />
           </>
         )}
       </main>
-
       <Footer />
     </div>
   );
@@ -110,10 +99,26 @@ function App() {
   const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
-      seedDatabase().then(() => setDbReady(true));
+      const init = async () => {
+          console.log("Initialisiere lets-race Auto-Provisioning...");
+          await syncService.fetchRemoteConfig();
+
+          try {
+              const pulled = await syncService.pullFromServer();
+              if (pulled) {
+                  console.log("Daten erfolgreich synchronisiert.");
+              } else {
+                  await seedDatabase();
+              }
+          } catch (e) {
+              await seedDatabase();
+          }
+          setDbReady(true);
+      };
+      init();
   }, []);
 
-  if (!dbReady) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">Loading Database...</div>;
+  if (!dbReady) return <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white font-display text-4xl italic uppercase animate-pulse tracking-tighter">Loading LT-Race...</div>;
 
   return (
     <NavigationProvider>

@@ -3,6 +3,7 @@ import React, { createContext, useContext, ReactNode, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../services/db';
 import { Team, Driver, Race, SessionResult } from '../types';
+import { syncService } from '../services/sync';
 
 interface DataContextType {
   teams: Team[];
@@ -31,115 +32,50 @@ interface DataContextType {
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Add a version signal to force refreshes if Dexie auto-observation lags
   const [dataVersion, setDataVersion] = useState(0);
-
   const forceUpdate = () => setDataVersion(v => v + 1);
 
-  // Use dataVersion in deps to force re-query on manual triggers
-  // Sort Teams by 'order' asc
   const teams = useLiveQuery(() => db.teams.orderBy('order').toArray(), [dataVersion]) || [];
-  
-  // Sort Drivers by 'order' asc (Global display order, usually implicitly Team Order + Driver #)
   const drivers = useLiveQuery(() => db.drivers.orderBy('order').toArray(), [dataVersion]) || [];
-  
-  // Sort Races by 'round' (which effectively acts as order)
   const races = useLiveQuery(() => db.races.orderBy('round').toArray(), [dataVersion]) || [];
-  
   const results = useLiveQuery(() => db.results.toArray(), [dataVersion]) || [];
 
-  // Standings Calculation
   const calculateAndSetStandings = async () => {
     const allDrivers = await db.drivers.toArray();
     const allTeams = await db.teams.toArray();
     const allResults = await db.results.toArray();
-
-    const driverStats: Record<string, { points: number, positions: number[] }> = {};
-    const teamStats: Record<string, { points: number, positions: number[] }> = {};
-
-    allDrivers.forEach(d => driverStats[d.id] = { points: 0, positions: [] });
-    allTeams.forEach(t => teamStats[t.id] = { points: 0, positions: [] });
-
+    const driverStats: Record<string, { points: number }> = {};
+    const teamStats: Record<string, { points: number }> = {};
+    allDrivers.forEach(d => driverStats[d.id] = { points: 0 });
+    allTeams.forEach(t => teamStats[t.id] = { points: 0 });
     allResults.forEach(session => {
         if (session.sessionType === 'race' || session.sessionType === 'sprint') {
             session.entries.forEach(entry => {
-                const pts = Number(entry.points) || 0;
-                
-                if (driverStats[entry.driverId]) {
-                    driverStats[entry.driverId].points += pts;
-                    const pos = parseInt(entry.position);
-                    if (!isNaN(pos)) {
-                        driverStats[entry.driverId].positions.push(pos);
-                    }
-                }
-                if (entry.teamId && teamStats[entry.teamId]) {
-                    teamStats[entry.teamId].points += pts;
-                }
+                if (driverStats[entry.driverId]) driverStats[entry.driverId].points += Number(entry.points) || 0;
+                if (entry.teamId && teamStats[entry.teamId]) teamStats[entry.teamId].points += Number(entry.points) || 0;
             });
         }
     });
-
-    // Helper for sorting based on points (Rank)
-    const sortDrivers = (a: any, b: any) => {
-        const statA = driverStats[a.id];
-        const statB = driverStats[b.id];
-        if (statB.points !== statA.points) return statB.points - statA.points;
-        return 0; // Simplified countback
-    };
-
-    const sortTeams = (a: any, b: any) => {
-        return teamStats[b.id].points - teamStats[a.id].points;
-    };
-
-    // Prepare updates - ONLY update rank/points/trend, do NOT touch 'order'
-    const sortedDriversByPoints = [...allDrivers].sort(sortDrivers);
-    const driverUpdates = sortedDriversByPoints.map((d, idx) => {
-        const stats = driverStats[d.id];
-        const newRank = idx + 1;
-        let trend: 'up' | 'down' | 'same' = 'same';
-        if (d.rank > 0 && d.rank !== newRank) trend = newRank < d.rank ? 'up' : 'down';
-        
-        return {
-            key: d.id,
-            changes: { points: stats.points, rank: newRank, trend }
-        };
-    });
-
-    const sortedTeamsByPoints = [...allTeams].sort(sortTeams);
-    const teamUpdates = sortedTeamsByPoints.map((t, idx) => {
-        const stats = teamStats[t.id];
-        const newRank = idx + 1;
-        let trend: 'up' | 'down' | 'same' = 'same';
-        if (t.rank > 0 && t.rank !== newRank) trend = newRank < t.rank ? 'up' : 'down';
-
-        return {
-            key: t.id,
-            changes: { points: stats.points, rank: newRank, trend }
-        };
-    });
-
-    // Execute bulk update
+    const sortedDrivers = [...allDrivers].sort((a, b) => driverStats[b.id].points - driverStats[a.id].points);
+    const sortedTeams = [...allTeams].sort((a, b) => teamStats[b.id].points - teamStats[a.id].points);
     await db.transaction('rw', db.drivers, db.teams, () => {
-        driverUpdates.forEach(u => db.drivers.update(u.key, u.changes));
-        teamUpdates.forEach(u => db.teams.update(u.key, u.changes));
+        sortedDrivers.forEach((d, idx) => db.drivers.update(d.id, { points: driverStats[d.id].points, rank: idx + 1 }));
+        sortedTeams.forEach((t, idx) => db.teams.update(t.id, { points: teamStats[t.id].points, rank: idx + 1 }));
     });
   };
 
-  // Wrapper for operations to ensure standings are updated and UI is notified
   const addTeam = async (team: Team) => {
-      // Auto-assign order at the end if not provided
-      if (team.order === undefined) {
-          const count = await db.teams.count();
-          team.order = count + 1;
-      }
+      if (team.order === undefined) team.order = (await db.teams.count()) + 1;
       await db.teams.put(team);
       await calculateAndSetStandings();
       forceUpdate();
+      syncService.autoPush();
   };
   const updateTeam = async (team: Team) => {
       await db.teams.put(team);
       await calculateAndSetStandings();
       forceUpdate();
+      syncService.autoPush();
   };
   const deleteTeam = async (id: string) => {
       await db.transaction('rw', db.teams, db.drivers, async () => {
@@ -148,92 +84,76 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
       await calculateAndSetStandings();
       forceUpdate();
+      syncService.autoPush();
   };
   const getTeam = (id: string) => teams.find(t => t.id === id);
 
   const addDriver = async (driver: Driver) => {
-      if (driver.order === undefined) {
-          const count = await db.drivers.count();
-          driver.order = count + 1;
-      }
+      if (driver.order === undefined) driver.order = (await db.drivers.count()) + 1;
       await db.drivers.put(driver);
       await calculateAndSetStandings();
       forceUpdate();
+      syncService.autoPush();
   };
   const updateDriver = async (driver: Driver) => {
       await db.drivers.put(driver);
       await calculateAndSetStandings();
       forceUpdate();
+      syncService.autoPush();
   };
   const deleteDriver = async (id: string) => {
       await db.drivers.delete(id);
       await calculateAndSetStandings();
       forceUpdate();
+      syncService.autoPush();
   };
   const getDriver = (id: string) => drivers.find(d => d.id === id);
-  // Returns drivers sorted by their global order (or you could sort locally)
   const getDriversByTeam = (teamId: string) => drivers.filter(d => d.teamId === teamId);
 
   const addRace = async (race: Race) => {
-      // Auto assign next round
-      const count = await db.races.count();
-      race.round = count + 1;
+      race.round = (await db.races.count()) + 1;
       await db.races.put(race);
       forceUpdate();
+      syncService.autoPush();
   };
   const updateRace = async (race: Race) => {
       await db.races.put(race);
       forceUpdate();
+      syncService.autoPush();
   };
   const deleteRace = async (id: string) => {
       await db.races.delete(id);
       forceUpdate();
+      syncService.autoPush();
   };
   const getRace = (id: string) => races.find(r => r.id === id);
 
   const updateSessionResult = async (result: SessionResult) => {
-    // Manually handle upsert logic based on composite key (raceId + sessionType)
     const existing = await db.results.where({ raceId: result.raceId, sessionType: result.sessionType }).first();
-    if (existing && existing.id) {
-        await db.results.put({ ...result, id: existing.id });
-    } else {
-        const { id, ...cleanResult } = result as any; 
-        await db.results.add(cleanResult);
-    }
+    if (existing) await db.results.put({ ...result, id: existing.id });
+    else await db.results.add(result);
     await calculateAndSetStandings();
     forceUpdate();
+    syncService.autoPush();
   };
 
-  const getSessionResult = (raceId: string, type: string) => {
-      return results.find(r => r.raceId === raceId && r.sessionType === type);
-  };
+  const getSessionResult = (raceId: string, type: string) => results.find(r => r.raceId === raceId && r.sessionType === type);
 
   const recalculateStandings = async () => {
       await calculateAndSetStandings();
       forceUpdate();
+      syncService.autoPush();
   };
 
   const reorderEntities = async (collection: 'teams' | 'drivers' | 'races', orderedItems: any[]) => {
-      if (collection === 'races') {
-          await db.transaction('rw', db.races, async () => {
-              for (let i = 0; i < orderedItems.length; i++) {
-                  await db.races.update(orderedItems[i].id, { round: i + 1 });
-              }
-          });
-      } else if (collection === 'teams') {
-          await db.transaction('rw', db.teams, async () => {
-              for (let i = 0; i < orderedItems.length; i++) {
-                  await db.teams.update(orderedItems[i].id, { order: i + 1 });
-              }
-          });
-      } else if (collection === 'drivers') {
-          await db.transaction('rw', db.drivers, async () => {
-              for (let i = 0; i < orderedItems.length; i++) {
-                  await db.drivers.update(orderedItems[i].id, { order: i + 1 });
-              }
-          });
-      }
+      const table = db.table(collection);
+      await db.transaction('rw', table, async () => {
+          for (let i = 0; i < orderedItems.length; i++) {
+              await table.update(orderedItems[i].id, { [collection === 'races' ? 'round' : 'order']: i + 1 });
+          }
+      });
       forceUpdate();
+      syncService.autoPush();
   };
 
   return (
@@ -251,8 +171,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useData = () => {
   const context = useContext(DataContext);
-  if (context === undefined) {
-    throw new Error('useData must be used within a DataProvider');
-  }
+  if (context === undefined) throw new Error('useData must be used within a DataProvider');
   return context;
 };

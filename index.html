@@ -5,7 +5,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PolePosition F1 News</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Added plugins=container-queries to enable @container support -->
+    <script src="https://cdn.tailwindcss.com?plugins=container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Teko:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
@@ -19,6 +20,7 @@
               f1: {
                 red: '#ff0000',
                 dark: '#0f1014',
+                card: '#1b1c20',
                 surface: '#18181b',
                 pink: '#e10059', 
                 gray: '#71717a'
@@ -50,6 +52,36 @@
         scrollbar-width: none;
       }
       
+      /* Global Custom Scrollbar for light areas */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 5px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f8fafc;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #e10059;
+      }
+
+      /* Dark Scrollbar for Hero Lists with Pink Thumb */
+      .custom-scrollbar-dark::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar-dark::-webkit-scrollbar-track {
+        background: #1b1c20;
+      }
+      .custom-scrollbar-dark::-webkit-scrollbar-thumb {
+        background: #e10059; /* Pink Thumb by default */
+        border-radius: 10px;
+      }
+      .custom-scrollbar-dark::-webkit-scrollbar-thumb:hover {
+        background: #ff0066; /* Slightly brighter pink on hover */
+      }
+
       .glass {
         background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(10px);
@@ -70,12 +102,15 @@
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
     "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
     "dexie": "https://esm.sh/dexie@3.2.4",
-    "dexie-react-hooks": "https://esm.sh/dexie-react-hooks@1.1.7"
+    "dexie-react-hooks": "https://esm.sh/dexie-react-hooks@1.1.7",
+    "@google/genai": "https://esm.sh/@google/genai@^1.41.0"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-f1-pink selection:text-white">
+  <body class="bg-f1-dark text-slate-100 antialiased selection:bg-f1-pink selection:text-white">
     <div id="root"></div>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

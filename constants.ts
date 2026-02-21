@@ -9,6 +9,29 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'TIPPSPIEL', href: '#' },
 ];
 
+export const BLOCK_SPACINGS: Record<string, string> = {
+  'custom/paragraph': 'my-7',
+  'custom/heading': 'my-7',
+  'custom/list': 'my-7',
+  'custom/quote': 'my-7',
+  'custom/details': 'my-7',
+  'custom/table': 'my-7',
+  'custom/image': 'my-7',
+  'custom/gallery': 'my-7',
+  'custom/slider': 'my-7',
+  'custom/youtube': 'my-7',
+  'custom/spotify': 'my-7',
+  'custom/separator': 'my-7',
+  'custom/comment': 'my-7',
+  'f1/driver': 'my-7',
+  'f1/team': 'my-7',
+  'f1/event': 'my-7',
+  'f1/calendar': 'my-7',
+  'f1/standings': 'my-7',
+  'f1/results': 'my-7',
+  'f1/title-watch': 'my-7'
+};
+
 export const COUNTRIES = [
     { name: 'Afghanistan', code: 'af' },
     { name: 'Ägypten', code: 'eg' },
@@ -124,12 +147,13 @@ export const INITIAL_POSTS: Post[] = [
     tags: ['Aktuell', 'Ausgewählt', 'Beliebt', 'Im Trend', 'Top News', 'Updated'],
     commentCount: 0,
     readTime: '3 minutes read',
-    section: 'hero',
+    section: ['highlight', 'feed'],
+    status: 'published',
     content: "Dies ist der Hauptartikel...",
     blocks: [
-      { id: '1', type: 'paragraph', content: "Die Formel 1 steht vor ihrer größten Revolution. Ab 2026 ändern sich die Regeln drastisch." },
-      { id: '2', type: 'heading-h2', content: "Was ändert sich am Motor?" },
-      { id: '3', type: 'paragraph', content: "Die MGU-H fällt weg, dafür wird der elektrische Anteil auf fast 50% erhöht. Das bedeutet mehr Drehmoment, aber auch neue Herausforderungen für die Fahrer." }
+      { clientId: 'b1', type: 'custom/paragraph', attributes: { content: "Die Formel 1 steht vor ihrer größten Revolution. Ab 2026 ändern sich die Regeln drastisch." }, innerBlocks: [] },
+      { clientId: 'b2', type: 'custom/heading', attributes: { level: 2, content: "Was ändert sich am Motor?" }, innerBlocks: [] },
+      { clientId: 'b3', type: 'custom/paragraph', attributes: { content: "Die MGU-H fällt weg, dafür wird der elektrische Anteil auf fast 50% erhöht. Das bedeutet mehr Drehmoment, aber auch neue Herausforderungen für die Fahrer." }, innerBlocks: [] }
     ]
   },
   {
@@ -141,7 +165,8 @@ export const INITIAL_POSTS: Post[] = [
     tags: [],
     commentCount: 0,
     readTime: '2 min',
-    section: 'recent',
+    section: ['aktuell'],
+    status: 'published',
     blocks: []
   },
   {
@@ -153,7 +178,8 @@ export const INITIAL_POSTS: Post[] = [
     tags: [],
     commentCount: 0,
     readTime: '4 min',
-    section: 'recent',
+    section: ['aktuell', 'ausgewählt'],
+    status: 'published',
     blocks: []
   },
   {
@@ -165,7 +191,8 @@ export const INITIAL_POSTS: Post[] = [
     tags: [],
     commentCount: 0,
     readTime: '3 min',
-    section: 'recent',
+    section: ['aktuell'],
+    status: 'published',
     blocks: []
   },
   {
@@ -177,19 +204,21 @@ export const INITIAL_POSTS: Post[] = [
     tags: [],
     commentCount: 0,
     readTime: '1 min',
-    section: 'recent',
+    section: ['aktuell'],
+    status: 'published',
     blocks: []
   },
   {
     id: 'tp-1',
-    title: "Supermax: Auch ohne die Krone neue Maßstäbe gesetzt!",
+    title: "Updated: Lando Norris dominiert in Silverstone!",
     author: 'Redaktion',
     date: '20.12.2025',
     image: 'https://picsum.photos/100/100?random=6',
-    tags: ['4'],
-    commentCount: 0,
-    readTime: '',
-    section: 'trending',
+    tags: ['Updated'],
+    commentCount: 1,
+    readTime: '2 min',
+    section: ['updated'],
+    status: 'published',
     blocks: []
   },
   {
@@ -198,10 +227,11 @@ export const INITIAL_POSTS: Post[] = [
     author: 'Redaktion',
     date: '20.12.2025',
     image: 'https://picsum.photos/100/100?random=7',
-    tags: ['5'],
+    tags: ['Geschenke'],
     commentCount: 0,
-    readTime: '',
-    section: 'trending',
+    readTime: '1 min',
+    section: ['trending'],
+    status: 'published',
     blocks: []
   },
   {
@@ -210,10 +240,11 @@ export const INITIAL_POSTS: Post[] = [
     author: 'Redaktion',
     date: '20.12.2025',
     image: 'https://picsum.photos/100/100?random=8',
-    tags: ['1'],
+    tags: ['Historie'],
     commentCount: 0,
-    readTime: '',
-    section: 'trending',
+    readTime: '5 min',
+    section: ['trending'],
+    status: 'published',
     blocks: []
   },
   {
@@ -222,10 +253,11 @@ export const INITIAL_POSTS: Post[] = [
     author: 'Redaktion',
     date: '20.12.2025',
     image: 'https://picsum.photos/100/100?random=9',
-    tags: ['2'],
+    tags: ['Analyse'],
     commentCount: 0,
-    readTime: '',
-    section: 'trending',
+    readTime: '3 min',
+    section: ['trending'],
+    status: 'published',
     blocks: []
   },
   {
@@ -237,7 +269,8 @@ export const INITIAL_POSTS: Post[] = [
     tags: ['Ausgewählt', 'Beliebt', 'Im Trend'],
     commentCount: 0,
     readTime: '3 minutes read',
-    section: 'grid',
+    section: ['ausgewählt', 'feed'],
+    status: 'published',
     blocks: []
   },
   {
@@ -249,7 +282,8 @@ export const INITIAL_POSTS: Post[] = [
     tags: ['Aktuell', 'Ausgewählt', 'Im Trend'],
     commentCount: 0,
     readTime: '3 minutes read',
-    section: 'grid',
+    section: ['ausgewählt'],
+    status: 'published',
     blocks: []
   },
   {
@@ -261,7 +295,8 @@ export const INITIAL_POSTS: Post[] = [
     tags: ['Aktuell', 'Ausgewählt', 'Beliebt', 'Im Trend'],
     commentCount: 0,
     readTime: '3 minutes read',
-    section: 'grid',
+    section: ['ausgewählt'],
+    status: 'published',
     blocks: []
   },
   {
@@ -273,7 +308,8 @@ export const INITIAL_POSTS: Post[] = [
     tags: ['Aktuell', 'Ausgewählt', 'Beliebt', 'Im Trend'],
     commentCount: 2,
     readTime: '2 minutes read',
-    section: 'grid',
+    section: ['ausgewählt'],
+    status: 'published',
     blocks: []
   },
   {
@@ -286,21 +322,23 @@ export const INITIAL_POSTS: Post[] = [
     tags: ['Ausgewählt', 'Beliebt', 'Im Trend'],
     commentCount: 0,
     readTime: '3 minutes read',
-    section: 'feed',
+    section: ['feed'],
+    status: 'published',
     content: "Full content here...",
     blocks: []
   },
   {
     id: 'fp-2',
     title: "Ne neue Nummer! Warum Startnummern 2026 mehr erzählen.",
-    excerpt: "Mit dem Ende der Saison 2025 rückt ein kleines, aber symbolisch starkes Detail immer mehr in den Fokus: die Startnummern der Formel-1-Fahrer. In der kommenden Saison wird Weltmeister Lando Norris erstmals mit der Startnummer 1 antreten, während **Max Verstappen nach dem Verlust seines WM-Titels von 2025 auf Nummer 3 wechselt...",
+    excerpt: "Mit dem Ende der Saison 2025 rückt ein kleines, aber symbolisch starkes detail immer mehr in den Fokus: die Startnummern der Formel-1-Fahrer. In der kommenden Saison wird Weltmeister Lando Norris erstmals mit der Startnummer 1 antreten, während **Max Verstappen nach dem Verlust seines WM-Titels von 2025 auf Nummer 3 wechselt...",
     author: 'Sascha Riefe',
     date: '20.12.2025',
     image: 'https://picsum.photos/600/400?random=15',
     tags: ['Aktuell', 'Ausgewählt', 'Im Trend'],
     commentCount: 0,
     readTime: '3 minutes read',
-    section: 'feed',
+    section: ['feed'],
+    status: 'published',
     blocks: []
   },
   {
@@ -313,20 +351,22 @@ export const INITIAL_POSTS: Post[] = [
     tags: ['Aktuell', 'Ausgewählt', 'Beliebt', 'Im Trend'],
     commentCount: 0,
     readTime: '3 minutes read',
-    section: 'feed',
+    section: ['feed'],
+    status: 'published',
     blocks: []
   },
   {
     id: 'fp-4',
     title: "Supermax: Auch ohne die Krone neue Maßstäbe gesetzt!",
-    excerpt: "Max Verstappen blickt auf die Saison 2025 zurück, die er im Titelkampf der Fahrer-Weltmeisterschaft nur um zwei Punkte verlor. Trotz des knapp verpassten fünften Weltmeistertitels hat Max Verstappen die Formel-1-Saison 2025 als die beste seiner bisherigen Karriere bezeichnet...",
+    excerpt: "Max Verstappen blickt auf die Saison 2025 zurück, die er im Titelkampf der fahrer-Weltmeisterschaft nur um zwei Punkte verlor. Trotz des knapp verpassten fünften Weltmeistertitels hat Max Verstappen die Formel-1-Saison 2025 als die beste seiner bisherigen Karriere bezeichnet...",
     author: 'Sascha Riefe',
     date: '20.12.2025',
     image: 'https://picsum.photos/600/400?random=17',
     tags: ['Aktuell', 'Ausgewählt', 'Beliebt', 'Im Trend'],
     commentCount: 0,
     readTime: '2 minutes read',
-    section: 'feed',
+    section: ['feed'],
+    status: 'published',
     blocks: []
   }
 ];

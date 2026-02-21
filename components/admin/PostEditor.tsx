@@ -1,569 +1,765 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Post, PostSection, ContentBlock, BlockType } from '../../types';
-import { X, Save, Image as ImageIcon, Tag, Clock, Layout, User, Plus, MoveUp, MoveDown, Trash2, Type, Quote, Heading, AlignLeft, ListChecks, Video, Layers, Code, Copyright } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Post, ContentBlock, BlockType, BlockAttributes, PostSection, User } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
+import { useNavigation, NavigationContext } from '../../contexts/NavigationContext';
+import { BLOCK_SPACINGS } from '../../constants';
+import { 
+  X, Save, MoveUp, MoveDown, Trash2, 
+  Monitor, Tablet, Smartphone, 
+  Eye, RefreshCw, AlertCircle, Cloud, Undo2, Redo2, Image as ImageIcon, AlertTriangle, Camera,
+  ChevronRight, ChevronLeft, Calendar, Clock, Facebook, Twitter, Linkedin, Copy, MessageSquare, Maximize,
+  Edit3, ExternalLink, SlidersHorizontal
+} from 'lucide-react';
+import MediaLibrary from './MediaLibrary';
+import FrontendBlockRenderer from '../article/BlockRenderer';
+import { EditorContext } from './editor/EditorContext';
+import { BlockRegistry, getBlockModule } from './BlockRegistry';
+import AutoResizeTextarea from './editor/AutoResizeTextarea';
+import BlockInserter from './editor/BlockInserter';
+import EditorInspector from './editor/EditorInspector';
 
-interface PostEditorProps {
-  post?: Post;
-  onSave: (post: Post) => void;
-  onCancel: () => void;
+// Utility: Slugify
+const slugify = (text: string) => {
+    return text.toString().toLowerCase()
+        .replace(/\s+/g, '-')           
+        .replace(/[^\w\-]+/g, '')       
+        .replace(/\-\-+/g, '-')         
+        .replace(/^-+/, '')             
+        .replace(/-+$/, '');            
+};
+
+const generateId = () => `block-${Math.random().toString(36).substr(2, 9)}`;
+
+// --- DEVICE TOOLBAR COMPONENT ---
+interface DeviceToolbarProps {
+    activeDevice: 'mobile' | 'tablet' | 'desktop' | 'custom';
+    previewWidth: number | '100%';
+    onDeviceChange: (mode: 'mobile' | 'tablet' | 'desktop') => void;
+    onWidthChange: (width: number) => void;
+    theme?: 'light' | 'dark';
 }
 
-// Helper to generate unique IDs
-const generateId = () => Math.random().toString(36).substr(2, 9);
-
-const PostEditor: React.FC<PostEditorProps> = ({ post, onSave, onCancel }) => {
-  // --- Global Metadata State ---
-  const [metadata, setMetadata] = useState<Partial<Post>>({
-    title: '',
-    excerpt: '',
-    author: 'Sascha Riefe',
-    date: new Date().toLocaleDateString('de-DE'),
-    image: 'https://picsum.photos/800/600',
-    heroCaption: '',
-    heroCredits: '',
-    tags: [],
-    readTime: '3 min read',
-    section: 'feed',
-    commentCount: 0
-  });
-
-  // --- Blocks State (The "Gutenberg" Content) ---
-  const [blocks, setBlocks] = useState<ContentBlock[]>([]);
-  const [tagInput, setTagInput] = useState('');
-  const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (post) {
-      setMetadata({
-        title: post.title,
-        excerpt: post.excerpt,
-        author: post.author,
-        date: post.date,
-        image: post.image,
-        heroCaption: post.heroCaption || '',
-        heroCredits: post.heroCredits || '',
-        tags: post.tags,
-        readTime: post.readTime,
-        section: post.section,
-        commentCount: post.commentCount
-      });
-      // Load blocks or create a default paragraph if none exist
-      if (post.blocks && post.blocks.length > 0) {
-        setBlocks(post.blocks);
-      } else if (post.content) {
-          // Legacy support: convert string content to paragraph block
-          setBlocks([{ id: generateId(), type: 'paragraph', content: post.content }]);
-      } else {
-        setBlocks([{ id: generateId(), type: 'paragraph', content: '' }]);
-      }
-    } else {
-       // New Post defaults
-       setBlocks([{ id: generateId(), type: 'paragraph', content: '' }]);
-    }
-  }, [post]);
-
-  // --- Handlers ---
-
-  const handleMetadataChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setMetadata(prev => ({ ...prev, [name]: value }));
-  };
-
-  // Tag Management
-  const handleAddTag = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      setMetadata(prev => ({ ...prev, tags: [...(prev.tags || []), tagInput.trim()] }));
-      setTagInput('');
-    }
-  };
-  const removeTag = (indexToRemove: number) => {
-    setMetadata(prev => ({ ...prev, tags: prev.tags?.filter((_, i) => i !== indexToRemove) }));
-  };
-
-  // Block Management
-  const addBlock = (type: BlockType, index?: number) => {
-    const newBlock: ContentBlock = { id: generateId(), type, content: '', items: [] };
-    if (index !== undefined) {
-      const newBlocks = [...blocks];
-      newBlocks.splice(index + 1, 0, newBlock);
-      setBlocks(newBlocks);
-    } else {
-      setBlocks(prev => [...prev, newBlock]);
-    }
-    setFocusedBlockId(newBlock.id);
-  };
-
-  const updateBlockContent = (id: string, content: string) => {
-    setBlocks(prev => prev.map(b => b.id === id ? { ...b, content } : b));
-  };
-  
-  const updateBlockItems = (id: string, itemsString: string) => {
-      // Split by newline for simple editing of lists/galleries
-      const items = itemsString.split('\n').filter(i => i.trim() !== '');
-      setBlocks(prev => prev.map(b => b.id === id ? { ...b, items, content: itemsString } : b));
-  };
-
-  const removeBlock = (id: string) => {
-    if (blocks.length === 1) return; // Don't delete the last block
-    setBlocks(prev => prev.filter(b => b.id !== id));
-  };
-
-  const moveBlock = (index: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === blocks.length - 1) return;
-
-    const newBlocks = [...blocks];
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    [newBlocks[index], newBlocks[targetIndex]] = [newBlocks[targetIndex], newBlocks[index]];
-    setBlocks(newBlocks);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!metadata.title || !metadata.section) return;
+const DeviceToolbar: React.FC<DeviceToolbarProps> = ({ activeDevice, previewWidth, onDeviceChange, onWidthChange, theme = 'light' }) => {
+    const isPreviewMode = theme === 'dark';
     
-    // Generate legacy text content for excerpts/search
-    const plainTextContent = blocks.map(b => b.content).join(' ');
-
-    const newPost: Post = {
-      id: post?.id || Date.now().toString(),
-      title: metadata.title!,
-      excerpt: metadata.excerpt || '',
-      content: plainTextContent, // Legacy fallback
-      blocks: blocks, // New structured content
-      author: metadata.author || 'Redaktion',
-      date: metadata.date || new Date().toLocaleDateString('de-DE'),
-      image: metadata.image || '',
-      heroCaption: metadata.heroCaption,
-      heroCredits: metadata.heroCredits,
-      tags: metadata.tags || [],
-      commentCount: metadata.commentCount || 0,
-      readTime: metadata.readTime || '',
-      section: metadata.section as PostSection
-    };
+    // Container Styles
+    const containerClass = isPreviewMode 
+        ? "bg-white/10 border-white/10 shadow-none text-white" 
+        : "bg-white border-slate-200 shadow-sm text-slate-600";
+        
+    // Button Styles
+    const btnActive = isPreviewMode 
+        ? "bg-f1-pink text-white shadow-glow" 
+        : "bg-f1-pink text-white shadow-md";
+        
+    const btnInactive = isPreviewMode 
+        ? "text-white/50 hover:text-white hover:bg-white/10" 
+        : "text-slate-400 hover:text-slate-700 hover:bg-slate-100";
+        
+    const separatorClass = isPreviewMode ? "bg-white/20" : "bg-slate-200";
     
-    onSave(newPost);
-  };
+    const inputClass = isPreviewMode
+        ? "bg-black/20 text-white border-white/10 placeholder:text-white/30 focus:ring-white/20 [color-scheme:dark]" 
+        : "bg-slate-50 text-slate-900 border-slate-200 placeholder:text-slate-400 focus:ring-f1-pink/20 [color-scheme:light]";
 
-  // --- Subcomponents for the Editor ---
-
-  const BlockControls = ({ index, id }: { index: number, id: string }) => (
-    <div className="absolute -left-12 top-0 flex flex-col space-y-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button type="button" onClick={() => moveBlock(index, 'up')} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded" title="Move Up">
-            <MoveUp size={14} />
-        </button>
-        <button type="button" onClick={() => moveBlock(index, 'down')} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded" title="Move Down">
-            <MoveDown size={14} />
-        </button>
-        <button type="button" onClick={() => removeBlock(id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="Delete Block">
-            <Trash2 size={14} />
-        </button>
-    </div>
-  );
-
-  const AddBlockMenu = ({ index }: { index: number }) => {
-     const [isOpen, setIsOpen] = useState(false);
-     
-     return (
-        <div className="relative group/add my-2 flex justify-center h-4 hover:h-8 transition-all items-center z-10">
-            <div className="absolute w-full h-[1px] bg-f1-pink/20 opacity-0 group-hover/add:opacity-100 transition-opacity"></div>
-            <button 
-                type="button"
-                onClick={() => setIsOpen(!isOpen)}
-                className="bg-white border border-slate-200 text-slate-500 rounded-full p-1 shadow-sm hover:border-f1-pink hover:text-f1-pink z-20 relative opacity-0 group-hover/add:opacity-100 transition-opacity transform hover:scale-110"
-            >
-                <Plus size={16} />
-            </button>
-
-            {isOpen && (
-                <>
-                <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)}></div>
-                <div className="absolute top-8 bg-white border border-slate-200 shadow-xl rounded-lg p-2 flex space-x-2 z-30 animate-in slide-in-from-top-2 duration-150 overflow-x-auto max-w-[90vw]">
-                    <button type="button" onClick={() => { addBlock('paragraph', index); setIsOpen(false); }} className="flex flex-col items-center p-2 hover:bg-slate-50 rounded-md text-xs text-slate-600 w-16">
-                        <AlignLeft size={20} className="mb-1" /> Text
-                    </button>
-                    <button type="button" onClick={() => { addBlock('heading-h2', index); setIsOpen(false); }} className="flex flex-col items-center p-2 hover:bg-slate-50 rounded-md text-xs text-slate-600 w-16">
-                        <Heading size={20} className="mb-1" /> H2
-                    </button>
-                    <button type="button" onClick={() => { addBlock('key-facts', index); setIsOpen(false); }} className="flex flex-col items-center p-2 hover:bg-slate-50 rounded-md text-xs text-slate-600 w-16">
-                        <ListChecks size={20} className="mb-1" /> Facts
-                    </button>
-                    <button type="button" onClick={() => { addBlock('image', index); setIsOpen(false); }} className="flex flex-col items-center p-2 hover:bg-slate-50 rounded-md text-xs text-slate-600 w-16">
-                        <ImageIcon size={20} className="mb-1" /> Image
-                    </button>
-                    <button type="button" onClick={() => { addBlock('video', index); setIsOpen(false); }} className="flex flex-col items-center p-2 hover:bg-slate-50 rounded-md text-xs text-slate-600 w-16">
-                        <Video size={20} className="mb-1" /> Video
-                    </button>
-                    <button type="button" onClick={() => { addBlock('gallery', index); setIsOpen(false); }} className="flex flex-col items-center p-2 hover:bg-slate-50 rounded-md text-xs text-slate-600 w-16">
-                        <Layers size={20} className="mb-1" /> Gallery
-                    </button>
-                    <button type="button" onClick={() => { addBlock('quote', index); setIsOpen(false); }} className="flex flex-col items-center p-2 hover:bg-slate-50 rounded-md text-xs text-slate-600 w-16">
-                        <Quote size={20} className="mb-1" /> Quote
-                    </button>
-                    <button type="button" onClick={() => { addBlock('embed', index); setIsOpen(false); }} className="flex flex-col items-center p-2 hover:bg-slate-50 rounded-md text-xs text-slate-600 w-16">
-                        <Code size={20} className="mb-1" /> Embed
-                    </button>
-                </div>
-                </>
-            )}
-        </div>
-     )
-  }
-
-  // --- Auto-resizing Textarea Component ---
-  const AutoTextarea = ({ value, onChange, className, placeholder, autoFocus, onBlur }: any) => {
-    const ref = useRef<HTMLTextAreaElement>(null);
-    
-    useEffect(() => {
-        if (ref.current) {
-            ref.current.style.height = 'auto';
-            ref.current.style.height = ref.current.scrollHeight + 'px';
-        }
-    }, [value]);
-
-    useEffect(() => {
-        if (autoFocus && ref.current) {
-            ref.current.focus();
-        }
-    }, [autoFocus]);
+    const unitTextClass = isPreviewMode ? "text-white/60" : "text-slate-400";
 
     return (
-        <textarea
-            ref={ref}
-            value={value}
-            onChange={onChange}
-            onBlur={onBlur}
-            className={className}
-            placeholder={placeholder}
-            rows={1}
-        />
-    )
-  }
-
-  return (
-    <div className="fixed inset-0 bg-slate-100 z-[60] overflow-hidden flex flex-col">
-      <form onSubmit={handleSubmit} className="h-full flex flex-col">
-        
-        {/* Top Navigation Bar */}
-        <div className="bg-white border-b border-slate-200 h-16 px-6 flex justify-between items-center shadow-sm z-40 shrink-0">
-           <div className="flex items-center space-x-4">
-               <button type="button" onClick={onCancel} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500">
-                   <X size={24} />
-               </button>
-               <div className="border-l border-slate-200 pl-4">
-                   <h2 className="font-sans font-semibold text-slate-900">{post ? 'Edit Post' : 'New Post'}</h2>
-                   <span className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">{metadata.section} section</span>
-               </div>
-           </div>
-           
-           <div className="flex items-center space-x-3">
-               <div className="text-xs text-slate-400 mr-4">
-                   {blocks.length} blocks • {metadata.readTime || '0 min read'}
-               </div>
-               <button type="submit" className="px-6 py-2 bg-f1-pink text-white rounded-md text-sm font-bold uppercase tracking-wide hover:bg-pink-700 shadow-sm flex items-center transition-all">
-                   <Save size={16} className="mr-2" />
-                   Publish
-               </button>
-           </div>
-        </div>
-
-        {/* Main Editor Layout */}
-        <div className="flex-grow flex overflow-hidden">
+        <div className={`flex items-center p-1.5 rounded-xl border ${containerClass} transition-colors duration-300`}>
+            <div className="flex items-center space-x-1">
+                <button 
+                    onClick={() => onDeviceChange('desktop')} 
+                    className={`p-2 rounded-lg transition-all duration-200 ${activeDevice === 'desktop' ? btnActive : btnInactive}`} 
+                    title="Desktop (100%)"
+                >
+                    <Monitor size={16}/>
+                </button>
+                <button 
+                    onClick={() => onDeviceChange('tablet')} 
+                    className={`p-2 rounded-lg transition-all duration-200 ${activeDevice === 'tablet' ? btnActive : btnInactive}`} 
+                    title="Tablet (768px)"
+                >
+                    <Tablet size={16}/>
+                </button>
+                <button 
+                    onClick={() => onDeviceChange('mobile')} 
+                    className={`p-2 rounded-lg transition-all duration-200 ${activeDevice === 'mobile' ? btnActive : btnInactive}`} 
+                    title="Mobile (375px)"
+                >
+                    <Smartphone size={16}/>
+                </button>
+            </div>
             
-            {/* Left Sidebar: Document Settings (WP Style) */}
-            <div className="w-80 bg-white border-r border-slate-200 overflow-y-auto shrink-0 p-6 hidden lg:block">
-                <h3 className="text-xs font-black uppercase text-slate-400 mb-6 tracking-widest">Article Settings</h3>
+            <div className={`h-5 w-px mx-3 ${separatorClass}`}></div>
+            
+            <div className="flex items-center relative group">
+                <div className="relative">
+                    <input 
+                        type="number" 
+                        min="320" 
+                        max="2560"
+                        value={previewWidth === '100%' ? '' : previewWidth} 
+                        placeholder="Auto"
+                        onChange={(e) => onWidthChange(parseInt(e.target.value))}
+                        className={`w-20 text-xs font-mono font-bold rounded-lg border py-1.5 px-3 text-center focus:outline-none focus:ring-2 transition-all ${inputClass}`}
+                    />
+                </div>
+                <span className={`text-[10px] ml-2 font-bold uppercase tracking-wider select-none ${unitTextClass}`}>px</span>
+            </div>
+        </div>
+    );
+};
+
+const BlockWrapper: React.FC<{ block: ContentBlock, index: number, isSelected: boolean }> = ({ block, index, isSelected }) => {
+    const { setSelectedBlockId, moveBlock, removeBlock } = React.useContext(EditorContext)!;
+
+    const module = getBlockModule(block.type);
+    const EditorComponent = module ? module.Editor : null;
+
+    const getSpacingClass = (type: string): string => {
+        return BLOCK_SPACINGS[type] || 'my-4';
+    };
+
+    return (
+        <div 
+            onClick={(e) => { 
+                e.stopPropagation(); 
+                setSelectedBlockId(block.clientId); 
+            }}
+            className={`group relative transition-all duration-200 border-2 rounded-lg -mx-[10px] ${getSpacingClass(block.type)} ${isSelected ? 'border-f1-pink ring-4 ring-f1-pink/5 z-10' : 'border-transparent hover:border-white/10'}`}
+        >
+            {isSelected && (
+                <div 
+                    className="absolute -top-9 right-0 bg-white border border-slate-200 text-slate-600 p-1 rounded-lg flex items-center space-x-1 shadow-sm z-50"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); moveBlock(block.clientId, 'up'); }} 
+                        className="p-1.5 hover:bg-slate-100 rounded transition-colors"
+                        title="Nach oben verschieben"
+                    >
+                        <MoveUp size={14}/>
+                    </button>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); moveBlock(block.clientId, 'down'); }} 
+                        className="p-1.5 hover:bg-slate-100 rounded transition-colors"
+                        title="Nach unten verschieben"
+                    >
+                        <MoveDown size={14}/>
+                    </button>
+                    <div className="w-px h-4 bg-slate-200 mx-1"></div>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); removeBlock(block.clientId); }} 
+                        className="p-1.5 hover:bg-red-50 text-red-400 hover:text-red-600 rounded transition-colors"
+                        title="Block löschen"
+                    >
+                        <Trash2 size={14}/>
+                    </button>
+                </div>
+            )}
+            <div className="p-2 min-h-[40px]">
+                {EditorComponent ? <EditorComponent block={block} /> : <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center italic">Block type {block.type} not found</div>}
+            </div>
+        </div>
+    );
+};
+
+const BlockList: React.FC<{ blocks: ContentBlock[] }> = ({ blocks }) => {
+    const ctx = React.useContext(EditorContext);
+    return (
+        <div className="pb-20">
+            {blocks.map((block, idx) => (
+                <BlockWrapper 
+                    key={block.clientId}
+                    block={block} 
+                    index={idx} 
+                    isSelected={ctx?.selectedBlockId === block.clientId} 
+                />
+            ))}
+        </div>
+    );
+};
+
+interface ConfirmationModalProps {
+    type: 'unsaved' | 'link';
+    target?: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+}
+
+const UnifiedConfirmationModal: React.FC<ConfirmationModalProps> = ({ type, target, onConfirm, onCancel }) => {
+    const isUnsaved = type === 'unsaved';
+    
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-f1-dark/80 backdrop-blur-md animate-in fade-in duration-200" onClick={onCancel}>
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full border border-slate-200 text-center animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                <div className="w-16 h-16 bg-red-50 text-f1-pink rounded-full flex items-center justify-center mx-auto mb-6">
+                    {isUnsaved ? <AlertTriangle size={32} /> : <ExternalLink size={32} />}
+                </div>
                 
-                <div className="space-y-6">
-                    {/* Placement */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700">Section Placement</label>
-                        <select 
-                            name="section" 
-                            value={metadata.section} 
-                            onChange={handleMetadataChange}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-f1-pink"
-                        >
-                            <option value="hero">Hero (Main Story)</option>
-                            <option value="recent">Recent News List</option>
-                            <option value="trending">Trending Sidebar</option>
-                            <option value="grid">Featured Grid</option>
-                            <option value="feed">Main Feed</option>
-                        </select>
-                    </div>
-
-                    {/* Meta */}
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700">Author</label>
-                        <div className="relative">
-                            <User size={14} className="absolute left-3 top-3 text-slate-400" />
-                            <input 
-                                type="text" 
-                                name="author" 
-                                value={metadata.author} 
-                                onChange={handleMetadataChange}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-f1-pink"
-                            />
-                        </div>
-                    </div>
-
-                     {/* Image */}
-                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700">Featured Media (Hero)</label>
-                        <div className="relative mb-2">
-                            <ImageIcon size={14} className="absolute left-3 top-3 text-slate-400" />
-                            <input 
-                                type="text" 
-                                name="image" 
-                                value={metadata.image} 
-                                onChange={handleMetadataChange}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-f1-pink"
-                                placeholder="Image URL..."
-                            />
-                        </div>
-                         <div className="relative mb-2">
-                            <Type size={14} className="absolute left-3 top-3 text-slate-400" />
-                            <input 
-                                type="text" 
-                                name="heroCaption" 
-                                value={metadata.heroCaption} 
-                                onChange={handleMetadataChange}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-md pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-f1-pink"
-                                placeholder="Caption / Description"
-                            />
-                        </div>
-                        <div className="relative">
-                            <Copyright size={14} className="absolute left-3 top-3 text-slate-400" />
-                            <input 
-                                type="text" 
-                                name="heroCredits" 
-                                value={metadata.heroCredits} 
-                                onChange={handleMetadataChange}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-md pl-9 pr-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-f1-pink"
-                                placeholder="Photo Credits"
-                            />
-                        </div>
-
-                        {metadata.image && (
-                            <div className="mt-2 rounded-md overflow-hidden aspect-video border border-slate-200 relative group">
-                                <img src={metadata.image} alt="Preview" className="w-full h-full object-cover" />
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Tags */}
-                    <div className="space-y-2">
-                         <label className="text-xs font-bold text-slate-700">Tags</label>
-                         <div className="flex flex-wrap gap-2 mb-2">
-                            {metadata.tags?.map((tag, index) => (
-                                <span key={index} className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-md flex items-center border border-slate-200">
-                                    {tag}
-                                    <button type="button" onClick={() => removeTag(index)} className="ml-1 hover:text-red-500"><X size={10} /></button>
-                                </span>
-                            ))}
-                        </div>
-                        <input 
-                            type="text" 
-                            value={tagInput}
-                            onChange={(e) => setTagInput(e.target.value)}
-                            onKeyDown={handleAddTag}
-                            className="w-full bg-slate-50 border border-slate-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-f1-pink"
-                            placeholder="Add tag..."
-                        />
-                    </div>
+                <h3 className="text-xl font-display font-black uppercase italic text-slate-900 mb-2">
+                    {isUnsaved ? 'Ungespeicherte Änderungen' : 'Externer Link'}
+                </h3>
+                
+                <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+                    {isUnsaved 
+                        ? "Du hast Änderungen am Artikel vorgenommen, die noch nicht gesichert wurden. Möchtest du den Editor wirklich verlassen?" 
+                        : "Du befindest dich im Vorschau-Modus. Möchtest du den Editor verlassen, um diesem Link zu folgen?"}
+                    {!isUnsaved && target && <br/>}
+                    {!isUnsaved && target && <span className="text-xs font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-400 mt-2 inline-block max-w-full truncate">{target}</span>}
+                </p>
+                
+                <div className="flex space-x-3 justify-center">
+                    <button 
+                        onClick={onConfirm} 
+                        className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold uppercase text-xs tracking-widest transition-colors"
+                    >
+                        {isUnsaved ? 'Schließen' : 'Öffnen'}
+                    </button>
+                    <button 
+                        onClick={onCancel} 
+                        className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold uppercase text-xs tracking-widest transition-colors"
+                    >
+                        Abbrechen
+                    </button>
                 </div>
             </div>
+        </div>
+    );
+};
 
-            {/* Central Canvas (Gutenberg Style) */}
-            <div className="flex-1 overflow-y-auto bg-[#f0f0f0] p-4 md:p-8 flex justify-center cursor-text" onClick={() => {
-                // Focus logic could go here
-            }}>
-                <div className="w-full max-w-3xl bg-white min-h-[100vh] shadow-sm p-8 md:p-16 rounded-sm">
-                    
-                    {/* Header Area */}
-                    <div className="mb-8 space-y-4">
-                        <AutoTextarea 
-                            name="title" 
-                            value={metadata.title} 
-                            onChange={handleMetadataChange}
-                            className="w-full text-4xl md:text-5xl font-display font-bold text-slate-900 placeholder-slate-300 focus:outline-none bg-transparent resize-none overflow-hidden"
-                            placeholder="Headline"
-                        />
-                        <AutoTextarea 
-                            name="excerpt" 
-                            value={metadata.excerpt} 
-                            onChange={handleMetadataChange}
-                            className="w-full text-xl text-slate-500 font-serif leading-relaxed focus:outline-none bg-transparent resize-none overflow-hidden"
-                            placeholder="Lead Teaser Paragraph..."
-                        />
-                    </div>
+interface EditorSnapshot {
+    blocks: ContentBlock[];
+    metadata: Partial<Post>;
+}
 
-                    <hr className="border-slate-100 mb-8" />
+interface ModalConfig {
+    isOpen: boolean;
+    type: 'unsaved' | 'link';
+    action: () => void;
+    targetUrl?: string;
+}
 
-                    {/* Blocks Area */}
-                    <div className="space-y-1">
-                        {blocks.map((block, index) => (
-                            <div key={block.id} className="relative group pl-2 md:pl-0">
-                                {/* Block Controls appear on hover */}
-                                <div className="hidden md:block">
-                                    <BlockControls index={index} id={block.id} />
+const PostEditor: React.FC<{ post?: Post, onSave: (post: Post) => void, onCancel: () => void }> = ({ post, onSave, onCancel }) => {
+    const { users, currentUser } = useAuth();
+    const realNavigation = useNavigation();
+    
+    const [blocks, setBlocks] = useState<ContentBlock[]>([]);
+    const [metadata, setMetadata] = useState<Partial<Post>>({});
+    const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+    const [mediaPickerTarget, setMediaPickerTarget] = useState<{ clientId: string, isCollection?: boolean } | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
+
+    const [activeDevice, setActiveDevice] = useState<'mobile' | 'tablet' | 'desktop' | 'custom'>('desktop');
+    const [previewWidth, setPreviewWidth] = useState<number | '100%'>('100%');
+
+    const handleDeviceChange = (mode: 'mobile' | 'tablet' | 'desktop') => {
+        setActiveDevice(mode);
+        if (mode === 'mobile') setPreviewWidth(375);
+        if (mode === 'tablet') setPreviewWidth(768);
+        if (mode === 'desktop') setPreviewWidth('100%');
+    };
+
+    const handleWidthChange = (width: number) => {
+        if (!isNaN(width) && width > 0) {
+            setPreviewWidth(width);
+            setActiveDevice('custom');
+        } else if (isNaN(width)) {
+            setPreviewWidth('100%');
+            setActiveDevice('desktop');
+        }
+    };
+
+    const [modalConfig, setModalConfig] = useState<ModalConfig>({
+        isOpen: false,
+        type: 'unsaved',
+        action: () => {}
+    });
+
+    const [past, setPast] = useState<EditorSnapshot[]>([]);
+    const [future, setFuture] = useState<EditorSnapshot[]>([]);
+
+    const eligibleAuthors = users.filter(u => ['admin', 'editor', 'it', 'author'].includes(u.role));
+    const getAuthorName = (u: User) => (u.firstName && u.lastName) ? `${u.firstName} ${u.lastName}` : u.username;
+
+    useEffect(() => {
+        if (post) {
+            const cleanMetadata = { ...post };
+            if (!Array.isArray(cleanMetadata.section)) {
+                cleanMetadata.section = [cleanMetadata.section as any];
+            }
+            if (!cleanMetadata.layoutOptions) {
+                cleanMetadata.layoutOptions = { showLatestNews: true, showNextRace: true, enableComments: true };
+            } else if (cleanMetadata.layoutOptions.enableComments === undefined) {
+                cleanMetadata.layoutOptions.enableComments = true;
+            }
+            setMetadata(cleanMetadata);
+            setBlocks(post.blocks || []);
+        } else {
+            const defaultAuthorName = currentUser ? getAuthorName(currentUser) : 'Redaktion';
+            const defaultAuthorId = currentUser ? currentUser.id : undefined;
+            setMetadata({ 
+                title: '', excerpt: '', slug: '', author: defaultAuthorName, authorId: defaultAuthorId,
+                section: ['feed'], tags: ['F1'], readTime: '3 min', status: 'draft',
+                layoutOptions: { showLatestNews: true, showNextRace: true, enableComments: true }
+            });
+            const defaultModule = BlockRegistry['custom/paragraph'];
+            if (defaultModule) {
+                setBlocks([{ clientId: generateId(), type: 'custom/paragraph', attributes: { ...defaultModule.defaultAttributes }, innerBlocks: [] }]);
+            }
+        }
+        setHasUnsavedChanges(false);
+        setPast([]);
+        setFuture([]);
+    }, [post]); 
+
+    const takeSnapshot = useCallback(() => {
+        setPast(prev => {
+            const newSnapshot: EditorSnapshot = {
+                blocks: JSON.parse(JSON.stringify(blocks)),
+                metadata: { ...metadata }
+            };
+            return [...prev.slice(-49), newSnapshot];
+        });
+        setFuture([]);
+    }, [blocks, metadata]);
+
+    const handleUndo = useCallback(() => {
+        if (past.length === 0) return;
+        const previous = past[past.length - 1];
+        const newPast = past.slice(0, past.length - 1);
+        setFuture(prev => [
+            { blocks: JSON.parse(JSON.stringify(blocks)), metadata: { ...metadata } },
+            ...prev.slice(0, 49)
+        ]);
+        setBlocks(previous.blocks);
+        setMetadata(previous.metadata);
+        setPast(newPast);
+        setHasUnsavedChanges(true);
+    }, [past, blocks, metadata]);
+
+    const handleRedo = useCallback(() => {
+        if (future.length === 0) return;
+        const next = future[0];
+        const newFuture = future.slice(1);
+        setPast(prev => [
+            ...prev,
+            { blocks: JSON.parse(JSON.stringify(blocks)), metadata: { ...metadata } }
+        ]);
+        setBlocks(next.blocks);
+        setMetadata(next.metadata);
+        setFuture(newFuture);
+        setHasUnsavedChanges(true);
+    }, [future, blocks, metadata]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const isZ = e.key.toLowerCase() === 'z';
+            const isY = e.key.toLowerCase() === 'y';
+            const isCtrl = e.ctrlKey || e.metaKey;
+            const isShift = e.shiftKey;
+            if (isCtrl && isZ) {
+                e.preventDefault();
+                if (isShift) handleRedo();
+                else handleUndo();
+            } else if (isCtrl && isY) {
+                e.preventDefault();
+                handleRedo();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleUndo, handleRedo]);
+
+    const handleClose = () => {
+        if (hasUnsavedChanges) {
+            setModalConfig({
+                isOpen: true,
+                type: 'unsaved',
+                action: onCancel
+            });
+        } else {
+            onCancel();
+        }
+    };
+
+    const handleSave = () => {
+        const finalSlug = metadata.slug || slugify(metadata.title || '');
+        onSave({ ...metadata as Post, slug: finalSlug, blocks });
+        setHasUnsavedChanges(false);
+    };
+
+    const handleMetadataChange = (key: keyof Post, value: any) => {
+        takeSnapshot();
+        setMetadata(prev => ({ ...prev, [key]: value }));
+        setHasUnsavedChanges(true);
+    };
+
+    const handleTitleChange = (val: string) => {
+        if (!hasUnsavedChanges) takeSnapshot();
+        setMetadata(prev => {
+            const isNewOrEmptySlug = !prev.slug || (prev.slug === slugify(prev.title || ''));
+            return { ...prev, title: val, slug: isNewOrEmptySlug ? slugify(val) : prev.slug };
+        });
+        setHasUnsavedChanges(true);
+    };
+
+    const handlePreviewClick = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement;
+        const link = target.closest('a');
+        if (link) {
+            e.preventDefault();
+            e.stopPropagation();
+            const href = link.getAttribute('href');
+            if (href) {
+                setModalConfig({
+                    isOpen: true,
+                    type: 'link',
+                    targetUrl: href,
+                    action: () => window.open(href, '_blank')
+                });
+            }
+        }
+    };
+
+    const handleInternalNav = (action: () => void, targetName: string) => {
+        setModalConfig({
+            isOpen: true,
+            type: 'link',
+            targetUrl: `Interner Link: ${targetName}`,
+            action: action
+        });
+    };
+
+    const previewNavigationContext = {
+        ...realNavigation,
+        goToDriver: (id: string) => handleInternalNav(() => {}, "Fahrer-Profil"),
+        goToTeam: (id: string) => handleInternalNav(() => {}, "Team-Profil"),
+        goToArticle: (id: string) => handleInternalNav(() => {}, "Artikel"),
+        goToStandings: () => handleInternalNav(() => {}, "WM-Stand"),
+        goToCalendar: () => handleInternalNav(() => {}, "Kalender"),
+        goToHome: () => handleInternalNav(() => {}, "Startseite"),
+    };
+
+    const findBlock = useCallback((tree: ContentBlock[], clientId: string): { block: ContentBlock, parentList: ContentBlock[], index: number } | null => {
+        for (let i = 0; i < tree.length; i++) {
+            if (tree[i].clientId === clientId) return { block: tree[i], parentList: tree, index: i };
+            const found = findBlock(tree[i].innerBlocks || [], clientId);
+            if (found) return found;
+        }
+        return null;
+    }, []);
+
+    const getBlock = useCallback((clientId: string) => {
+        const result = findBlock(blocks, clientId);
+        return result?.block;
+    }, [blocks, findBlock]);
+
+    const updateBlock = (clientId: string, attributes: Partial<BlockAttributes>) => {
+        takeSnapshot();
+        setBlocks(prev => {
+            const next = JSON.parse(JSON.stringify(prev));
+            const target = findBlock(next, clientId);
+            if (target) target.block.attributes = { ...target.block.attributes, ...attributes };
+            return next;
+        });
+        setHasUnsavedChanges(true);
+    };
+
+    const removeBlock = (clientId: string) => {
+        takeSnapshot();
+        setBlocks(prev => {
+            const next = JSON.parse(JSON.stringify(prev));
+            const target = findBlock(next, clientId);
+            if (target) target.parentList.splice(target.index, 1);
+            return next;
+        });
+        if (selectedBlockId === clientId) setSelectedBlockId(null);
+        setHasUnsavedChanges(true);
+    };
+
+    const insertBlock = (type: BlockType, atIndex?: number) => {
+        takeSnapshot();
+        const module = BlockRegistry[type];
+        const defaultAttrs = module ? module.defaultAttributes : {};
+        const newBlock: ContentBlock = { clientId: generateId(), type, attributes: { ...defaultAttrs }, innerBlocks: [] };
+        
+        setBlocks(prev => {
+            const next = JSON.parse(JSON.stringify(prev));
+            if (typeof atIndex === 'number') {
+                next.splice(atIndex, 0, newBlock);
+            } else if (selectedBlockId) {
+                const current = findBlock(next, selectedBlockId);
+                if (current) current.parentList.splice(current.index + 1, 0, newBlock);
+                else next.push(newBlock);
+            } else {
+                next.push(newBlock);
+            }
+            return next;
+        });
+        setSelectedBlockId(newBlock.clientId);
+        setHasUnsavedChanges(true);
+    };
+
+    const moveBlock = (clientId: string, direction: 'up' | 'down') => {
+        takeSnapshot();
+        setBlocks(prev => {
+            const next = JSON.parse(JSON.stringify(prev));
+            const target = findBlock(next, clientId);
+            if (!target) return prev;
+            const newIndex = direction === 'up' ? target.index - 1 : target.index + 1;
+            if (newIndex < 0 || newIndex >= target.parentList.length) return prev;
+            [target.parentList[target.index], target.parentList[newIndex]] = [target.parentList[newIndex], target.parentList[target.index]];
+            return next;
+        });
+        setHasUnsavedChanges(true);
+    };
+
+    const selectedBlock = findBlock(blocks, selectedBlockId || '')?.block;
+    const showLatestNews = metadata.layoutOptions?.showLatestNews !== false;
+    const showNextRace = metadata.layoutOptions?.showNextRace !== false;
+    const enableComments = metadata.layoutOptions?.enableComments !== false;
+    const showRightSidebar = showLatestNews || showNextRace;
+    const sections = Array.isArray(metadata.section) ? metadata.section : [metadata.section || 'feed'];
+
+    return (
+        <EditorContext.Provider value={{ selectedBlockId, setSelectedBlockId, updateBlock, removeBlock, moveBlock, insertBlock, setMediaPickerTarget, getBlock }}>
+            <div className="fixed inset-0 bg-white z-[60] flex flex-col font-sans text-slate-900 overflow-hidden">
+                
+                {modalConfig.isOpen && (
+                    <UnifiedConfirmationModal 
+                        type={modalConfig.type} 
+                        target={modalConfig.targetUrl}
+                        onConfirm={() => {
+                            setModalConfig({ ...modalConfig, isOpen: false });
+                            modalConfig.action();
+                        }}
+                        onCancel={() => setModalConfig({ ...modalConfig, isOpen: false })}
+                    />
+                )}
+
+                {showPreview && (
+                    <NavigationContext.Provider value={previewNavigationContext}>
+                        <div className="fixed inset-0 z-[100] bg-neutral-950 text-slate-300 overflow-hidden animate-in fade-in duration-200 flex flex-col">
+                            <header className="h-14 border-b border-white/10 bg-neutral-900/90 backdrop-blur-md shrink-0 z-50 relative">
+                                <div className="flex items-center justify-between px-4 h-full w-full">
+                                    <div className="flex items-center space-x-1">
+                                        <button onClick={() => setShowPreview(false)} className="flex items-center px-3 py-1.5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors mr-2 text-[10px] font-bold uppercase tracking-wider" title="Zurück zum Editor">
+                                            <ChevronLeft size={14} className="mr-1" /> Zurück zum Editor
+                                        </button>
+                                        <div className="w-px h-6 bg-white/10 mx-1"></div>
+                                        <button onClick={handleUndo} disabled={past.length === 0} className={`p-2 rounded-lg transition-all flex items-center justify-center ${past.length === 0 ? 'text-white/10 cursor-not-allowed' : 'text-slate-400 hover:bg-white/10 hover:text-f1-pink'}`} title="Rückgängig (Ctrl+Z)"><Undo2 size={20} /></button>
+                                        <button onClick={handleRedo} disabled={future.length === 0} className={`p-2 rounded-lg transition-all flex items-center justify-center ${future.length === 0 ? 'text-white/10 cursor-not-allowed' : 'text-slate-400 hover:bg-white/10 hover:text-f1-pink'}`} title="Wiederherstellen (Ctrl+Y)"><Redo2 size={20} /></button>
+                                    </div>
+                                    <div className="flex items-center space-x-4">
+                                        {hasUnsavedChanges ? <div className="flex items-center text-amber-500 animate-pulse text-[10px] font-bold uppercase tracking-widest"><AlertCircle size={14} className="mr-1.5" /> Ungespeichert</div> : <div className="flex items-center text-slate-500 text-[10px] font-bold uppercase tracking-widest"><Cloud size={14} className="mr-1.5" /> Gespeichert</div>}
+                                        <button onClick={handleSave} className="bg-f1-pink text-white px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-pink-700 transition-all flex items-center shadow-glow"><Save size={16} className="mr-2" /> Speichern</button>
+                                    </div>
                                 </div>
-                                
-                                {/* Block Content Renderers */}
-                                <div className="relative">
-                                    
-                                    {block.type === 'paragraph' && (
-                                        <AutoTextarea
-                                            value={block.content}
-                                            onChange={(e: any) => updateBlockContent(block.id, e.target.value)}
-                                            className="w-full text-lg leading-relaxed text-slate-800 placeholder-slate-300 focus:outline-none bg-transparent resize-none"
-                                            placeholder="Type / to choose a block"
-                                            autoFocus={focusedBlockId === block.id}
-                                        />
-                                    )}
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center"><div className="pointer-events-auto"><DeviceToolbar activeDevice={activeDevice} previewWidth={previewWidth} onDeviceChange={handleDeviceChange} onWidthChange={handleWidthChange} theme="dark" /></div></div>
+                            </header>
 
-                                    {block.type === 'heading-h2' && (
-                                        <AutoTextarea
-                                            value={block.content}
-                                            onChange={(e: any) => updateBlockContent(block.id, e.target.value)}
-                                            className="w-full text-2xl font-display font-bold text-slate-900 placeholder-slate-300 focus:outline-none bg-transparent resize-none mt-8 mb-2"
-                                            placeholder="Heading 2"
-                                            autoFocus={focusedBlockId === block.id}
-                                        />
-                                    )}
-
-                                    {block.type === 'heading-h3' && (
-                                        <AutoTextarea
-                                            value={block.content}
-                                            onChange={(e: any) => updateBlockContent(block.id, e.target.value)}
-                                            className="w-full text-xl font-display font-bold text-slate-800 placeholder-slate-300 focus:outline-none bg-transparent resize-none mt-6 mb-2"
-                                            placeholder="Heading 3"
-                                            autoFocus={focusedBlockId === block.id}
-                                        />
-                                    )}
-
-                                    {block.type === 'quote' && (
-                                        <div className="flex border-l-4 border-f1-pink pl-4 my-6 bg-slate-50 p-6 rounded-r-lg">
-                                            <Quote size={20} className="text-f1-pink mr-3 shrink-0 mt-1" />
-                                            <AutoTextarea
-                                                value={block.content}
-                                                onChange={(e: any) => updateBlockContent(block.id, e.target.value)}
-                                                className="w-full text-xl italic font-serif text-slate-700 placeholder-slate-300 focus:outline-none bg-transparent resize-none"
-                                                placeholder="Enter quote..."
-                                                autoFocus={focusedBlockId === block.id}
-                                            />
+                            <div className="flex-1 overflow-y-auto overflow-x-auto flex justify-center py-8">
+                                <div className={`transition-all duration-300 bg-f1-dark shadow-2xl relative shrink-0 border border-white/10 @container ${activeDevice !== 'desktop' ? 'overflow-hidden' : ''}`} style={{ width: previewWidth === '100%' ? '100%' : `${previewWidth}px`, maxWidth: previewWidth === '100%' ? '100%' : 'none', minHeight: '100%', height: 'fit-content', borderRadius: activeDevice === 'mobile' ? '40px' : activeDevice === 'tablet' ? '12px' : '0', borderWidth: activeDevice === 'mobile' ? '8px' : activeDevice === 'tablet' ? '4px' : '0', borderColor: activeDevice !== 'desktop' ? '#262626' : 'transparent' }}>
+                                    <article className="bg-f1-dark min-h-full pb-20 font-sans" onClickCapture={handlePreviewClick}>
+                                        <div className="container mx-auto px-4 py-4 flex items-center text-xs text-slate-500 uppercase font-bold tracking-wider">
+                                            <span className="text-slate-400">Home</span>
+                                            <ChevronRight size={12} className="mx-2 shrink-0" />
+                                            <span className="text-f1-pink">News</span>
+                                            <ChevronRight size={12} className="mx-2 shrink-0" />
+                                            <span className="flex-1 min-w-0 truncate text-white">{metadata.title || 'Vorschau'}</span>
                                         </div>
-                                    )}
 
-                                    {block.type === 'key-facts' && (
-                                        <div className="my-6 p-6 bg-slate-50 border border-slate-200 rounded-xl">
-                                            <div className="flex items-center text-f1-pink mb-3 font-bold uppercase text-xs tracking-widest">
-                                                <ListChecks size={16} className="mr-2" />
-                                                Key Facts & Takeaways
+                                        <header className="container mx-auto px-4 lg:max-w-4xl xl:max-w-5xl text-center mb-8 flex flex-col items-center">
+                                            <div className="flex flex-wrap justify-center gap-2 mb-6">
+                                                {sections.map(sec => (
+                                                    <span key={sec} className="bg-f1-pink text-white px-2 py-0.5 sm:px-3 sm:py-1 text-[7px] sm:text-[10px] font-bold uppercase tracking-widest rounded shadow-glow">{sec}</span>
+                                                ))}
                                             </div>
-                                            <AutoTextarea
-                                                value={block.content}
-                                                onChange={(e: any) => updateBlockItems(block.id, e.target.value)}
-                                                className="w-full text-base leading-relaxed text-slate-700 placeholder-slate-300 focus:outline-none bg-transparent resize-none font-medium"
-                                                placeholder="Enter one fact per line..."
-                                                autoFocus={focusedBlockId === block.id}
-                                            />
-                                        </div>
-                                    )}
-
-                                    {block.type === 'image' && (
-                                        <div className="my-6 bg-slate-50 p-4 rounded-lg border border-slate-200 border-dashed">
-                                            <div className="flex items-center space-x-2 mb-2">
-                                                <ImageIcon size={16} className="text-slate-400" />
-                                                <input
-                                                    type="text"
-                                                    value={block.content}
-                                                    onChange={(e) => updateBlockContent(block.id, e.target.value)}
-                                                    className="flex-1 bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-f1-pink"
-                                                    placeholder="Paste image URL..."
-                                                    autoFocus={focusedBlockId === block.id}
-                                                />
-                                            </div>
-                                            {block.content && (
-                                                <div className="rounded overflow-hidden shadow-sm">
-                                                    <img src={block.content} alt="Block content" className="w-full h-auto" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-display font-bold text-white leading-[1.1] px-6 mb-8 uppercase tracking-tighter italic break-words w-full text-center">
+                                                {metadata.title}
+                                            </h1>
+                                            <div className="flex flex-wrap justify-center items-center gap-6 text-[10px] text-slate-500 border-y border-white/5 py-6 mb-8 uppercase font-bold tracking-widest w-full">
+                                                <div className="flex items-center">
+                                                    <div className="w-8 h-8 rounded-full bg-slate-800 overflow-hidden mr-3 border border-white/10">
+                                                        <img src={`https://ui-avatars.com/api/?name=${metadata.author}&background=random`} alt={metadata.author} />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <div className="text-slate-500">Written by</div>
+                                                        <div className="text-white text-xs">{metadata.author}</div>
+                                                    </div>
                                                 </div>
+                                                <div className="w-px h-8 bg-white/10 hidden sm:block"></div>
+                                                <div className="flex items-center space-x-6">
+                                                    <div className="flex items-center"><Calendar size={14} className="mr-2 text-f1-pink" /><span>{metadata.date}</span></div>
+                                                    {metadata.isUpdated && (
+                                                        <div className="flex items-center text-f1-pink"><RefreshCw size={14} className="mr-1.5" /> Updated</div>
+                                                    )}
+                                                    <div className="flex items-center"><Clock size={14} className="mr-2 text-f1-pink" /><span>{metadata.readTime}</span></div>
+                                                </div>
+                                            </div>
+                                        </header>
+
+                                        <div className="container mx-auto px-0 md:px-4 lg:max-w-6xl mb-12">
+                                            <div className="relative aspect-video md:rounded-2xl overflow-hidden shadow-2xl group bg-f1-card border border-white/5">
+                                                {metadata.image && <img src={metadata.image} className="w-full h-full object-cover" />}
+                                                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-f1-dark via-black/40 to-transparent p-6 md:p-8 pt-20 z-10 flex flex-col justify-end items-start">
+                                                    <div className="flex flex-col space-y-2 w-full max-w-2xl">
+                                                        {metadata.heroCredits && (<div className="flex items-center space-x-2"><Camera size={12} className="text-f1-pink" /><span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 font-sans">{metadata.heroCredits}</span></div>)}
+                                                        {metadata.heroCaption && (<div className="text-2xl font-bold text-white leading-none italic font-display uppercase tracking-tight">{metadata.heroCaption}</div>)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className={`container mx-auto px-4 lg:max-w-6xl flex flex-col ${previewWidth === '100%' || (typeof previewWidth === 'number' && previewWidth >= 1024) ? 'lg:flex-row' : ''} gap-12`}>
+                                            {(previewWidth === '100%' || (typeof previewWidth === 'number' && previewWidth >= 1024)) && (
+                                                <aside className="hidden lg:flex flex-col w-20 sticky top-32 h-fit items-center space-y-6 pt-12">
+                                                    <div className="text-[10px] font-bold uppercase -rotate-90 mb-10 text-slate-600 tracking-widest whitespace-nowrap">Share Article</div>
+                                                    <button className="p-3 rounded-full bg-white/5 text-slate-400 hover:text-white transition-all shadow-sm border border-white/5"><Facebook size={20} /></button>
+                                                    <button className="p-3 rounded-full bg-white/5 text-slate-400 hover:text-white transition-all shadow-sm border border-white/5"><Twitter size={20} /></button>
+                                                    <button className="p-3 rounded-full bg-white/5 text-slate-400 hover:text-white transition-all shadow-sm border border-white/5"><Copy size={20} /></button>
+                                                    <div className="w-px h-20 bg-white/5 my-4"></div>
+                                                    <div className="flex flex-col items-center"><MessageSquare size={20} className="text-f1-pink mb-1" /><span className="text-xs font-bold text-white">{metadata.commentCount || 0}</span></div>
+                                                </aside>
+                                            )}
+                                            <div className="flex-1 max-w-3xl mx-auto w-full">
+                                                {metadata.excerpt && (<div className="text-xl md:text-2xl font-serif italic leading-relaxed text-slate-200 mb-10 border-b border-white/5 pb-10 first-letter:text-6xl first-letter:font-black first-letter:text-f1-pink first-letter:mr-3 first-letter:float-left first-letter:leading-none">{metadata.excerpt}</div>)}
+                                                <div className="article-body">{blocks.map(block => <FrontendBlockRenderer key={block.clientId} block={block} />)}</div>
+                                                <div className="mt-16 pt-8 border-t border-white/5">
+                                                    <h4 className="text-[10px] font-bold uppercase text-slate-600 mb-6 tracking-widest">Related Topics</h4>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {(metadata.tags || ['Placeholder']).map(tag => (<button key={tag} className="px-3 py-1 sm:px-4 sm:py-2 bg-white/5 text-slate-400 rounded-lg text-[9px] sm:text-xs font-bold uppercase tracking-wider hover:bg-f1-pink hover:text-white transition-colors border border-white/5">#{tag}</button>))}
+                                                    </div>
+                                                </div>
+                                                <div className="mt-12 bg-f1-card p-8 rounded-2xl flex flex-col md:flex-row items-center md:items-start text-center md:text-left gap-6 select-none pointer-events-none grayscale border border-white/5"><div className="w-20 h-20 rounded-full overflow-hidden border-4 border-f1-dark shadow-md flex-shrink-0 bg-slate-700"></div><div><div className="text-xs font-bold uppercase text-f1-pink tracking-widest mb-1">About the Author</div><h3 className="text-xl font-display font-bold text-white mb-2">{metadata.author}</h3><p className="text-sm text-slate-400 leading-relaxed">Senior Formula 1 Editor covering the paddock since 2018...</p></div></div>
+                                                {enableComments && (<div className="mt-12 p-8 border border-white/10 bg-f1-card rounded-2xl text-center select-none pointer-events-none"><MessageSquare size={32} className={`mx-auto mb-4 ${enableComments ? 'text-f1-pink' : 'text-slate-600'}`} /><h3 className="text-xl font-display font-bold text-white">Join the Conversation</h3><p className="text-slate-400 mb-6 text-sm">Be the first to comment on this story.</p><button className="bg-f1-pink text-white px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest">Write a Comment</button></div>)}
+                                            </div>
+                                            {showRightSidebar && (
+                                                <aside className={`w-72 shrink-0 ${(previewWidth === '100%' || (typeof previewWidth === 'number' && previewWidth >= 1280)) ? 'hidden xl:block' : 'hidden'}`}><div className="sticky top-24">{showLatestNews && (<><div className="flex items-center mb-6"><div className="w-1 h-4 bg-f1-pink rounded-full mr-3"></div><h3 className="text-sm font-bold uppercase tracking-widest text-white">Latest News</h3></div><div className="space-y-6">{[1,2,3].map(i => (<div key={i} className="group cursor-pointer"><div className="text-[10px] text-slate-400 mb-1 flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-f1-pink mr-2"></span>{i * 15} MIN AGO</div><h4 className="text-sm font-bold text-slate-200 leading-snug group-hover:text-f1-pink transition-colors">Toto Wolff warns about 2026 regulations loopholes</h4></div>))}</div></>)}{showNextRace && (<div className="mt-12 p-6 bg-f1-card border border-white/10 rounded-xl text-white text-center relative overflow-hidden"><div className="relative z-10"><div className="text-xs font-bold text-f1-pink uppercase tracking-widest mb-2">Next Race</div><div className="text-2xl font-display font-bold mb-1">Bahrain GP</div><div className="text-sm text-slate-400">11.02.2026</div><button className="mt-4 w-full py-2 bg-white/10 hover:bg-white/20 rounded text-xs font-bold uppercase transition-colors">Race Center</button></div></div>)}</div></aside>
                                             )}
                                         </div>
-                                    )}
+                                    </article>
+                                </div>
+                            </div>
+                        </div>
+                    </NavigationContext.Provider>
+                )}
 
-                                    {block.type === 'video' && (
-                                        <div className="my-6 bg-slate-50 p-4 rounded-lg border border-slate-200 border-dashed">
-                                            <div className="flex items-center space-x-2 mb-2">
-                                                <Video size={16} className="text-slate-400" />
-                                                <input
-                                                    type="text"
-                                                    value={block.content}
-                                                    onChange={(e) => updateBlockContent(block.id, e.target.value)}
-                                                    className="flex-1 bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:outline-none focus:border-f1-pink"
-                                                    placeholder="Paste Video URL (YouTube, Vimeo, MP4)..."
-                                                    autoFocus={focusedBlockId === block.id}
-                                                />
+                {mediaPickerTarget && (
+                    <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-8"><div className="bg-white w-full max-w-5xl h-full rounded-2xl overflow-hidden shadow-2xl"><MediaLibrary onSelect={(item) => { if (mediaPickerTarget.clientId === 'post_image') handleMetadataChange('image', item.url); else if (mediaPickerTarget.isCollection) { const current = selectedBlock?.attributes?.images || []; const newImage = { id: generateId(), url: item.url, credit: '', alt: '', crop: true, align: 'center' }; updateBlock(mediaPickerTarget.clientId, { images: [...current, newImage] }); } else updateBlock(mediaPickerTarget.clientId, { url: item.url }); setMediaPickerTarget(null); }} onClose={() => setMediaPickerTarget(null)} /></div></div>
+                )}
+
+                <EditorInspector metadata={metadata} onMetadataChange={handleMetadataChange} />
+
+                <header className="h-14 border-b border-slate-200 bg-white shrink-0 z-[70] relative">
+                    <div className="flex items-center justify-between px-4 h-full w-full">
+                        <div className="flex items-center space-x-1">
+                            <button onClick={handleClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-900 transition-colors mr-2" title="Schließen"><X size={20} /></button>
+                            <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                            <button onClick={handleUndo} disabled={past.length === 0} className={`p-2 rounded-lg transition-all flex items-center justify-center ${past.length === 0 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-100 hover:text-f1-pink'}`} title="Rückgängig (Ctrl+Z)"><Undo2 size={20} /></button>
+                            <button onClick={handleRedo} disabled={future.length === 0} className={`p-2 rounded-lg transition-all flex items-center justify-center ${future.length === 0 ? 'text-slate-200 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-100 hover:text-f1-pink'}`} title="Wiederherstellen (Ctrl+Y)"><Redo2 size={20} /></button>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            {hasUnsavedChanges ? <div className="flex items-center text-amber-500 animate-pulse text-[10px] font-bold uppercase tracking-widest"><AlertCircle size={14} className="mr-1.5" /> Ungespeichert</div> : <div className="flex items-center text-slate-300 text-[10px] font-bold uppercase tracking-widest"><Cloud size={14} className="mr-1.5" /> Gespeichert</div>}
+                            <button onClick={() => setShowPreview(true)} className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center"><Eye size={16} className="mr-2" /> Vorschau</button>
+                            <button onClick={handleSave} className="bg-f1-pink text-white px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-pink-700 transition-all flex items-center shadow-glow"><Save size={16} className="mr-2" /> Speichern</button>
+                        </div>
+                    </div>
+                    <div className="absolute inset-0 pointer-events-none flex items-center lg:pr-80"><div className="transition-all duration-300 shrink-0 w-80"></div><div className="flex-1 flex justify-center pointer-events-auto"><DeviceToolbar activeDevice={activeDevice} previewWidth={previewWidth} onDeviceChange={handleDeviceChange} onWidthChange={handleWidthChange} /></div></div>
+                </header>
+
+                <div className="flex flex-1 overflow-hidden">
+                    <BlockInserter />
+                    <main onClick={() => setSelectedBlockId(null)} className="flex-1 overflow-y-auto bg-white pt-10 pb-40 custom-scrollbar transition-all duration-300 lg:mr-80">
+                        <div onClick={(e) => { e.stopPropagation(); setSelectedBlockId(null); }} className="mx-auto transition-all duration-500 bg-f1-dark shadow-2xl border border-white/5 min-h-screen h-auto relative overflow-hidden @container" style={{ width: previewWidth === '100%' ? '100%' : `${previewWidth}px`, maxWidth: previewWidth === '100%' ? '1152px' : '100%', borderRadius: activeDevice === 'mobile' ? '40px 40px 0 0' : activeDevice === 'tablet' ? '12px 12px 0 0' : '16px 16px 0 0', borderWidth: activeDevice === 'mobile' ? '8px 8px 0 8px' : activeDevice === 'tablet' ? '4px 4px 0 4px' : '0', borderColor: activeDevice !== 'desktop' ? '#262626' : 'transparent' }}>
+                            
+                            <div className="container mx-auto px-4 py-4 flex items-center text-xs text-slate-500 uppercase font-bold tracking-wider mb-0 select-none cursor-default">
+                                <span className="hover:text-f1-pink transition-colors shrink-0">Home</span>
+                                <ChevronRight size={12} className="mx-2 shrink-0" />
+                                <span className="text-f1-pink shrink-0">News</span>
+                                <ChevronRight size={12} className="mx-2 shrink-0" />
+                                <span className="flex-1 min-w-0 truncate text-slate-400 italic">
+                                    {metadata.title || 'Neuer Artikel'}
+                                </span>
+                            </div>
+
+                            <div className="py-8">
+                                <header className="max-w-4xl xl:max-w-5xl mx-auto px-4 flex flex-col items-center mb-8">
+                                    <div className="flex justify-center gap-2 mb-6 flex-wrap">
+                                        {sections.map((sec, i) => (
+                                            <span key={i} className="bg-f1-pink text-white px-2 py-0.5 sm:px-3 sm:py-1 text-[7px] sm:text-[10px] font-bold uppercase tracking-widest rounded shadow-glow cursor-default">{sec}</span>
+                                        ))}
+                                    </div>
+                                    <div className="w-full flex justify-center">
+                                        <AutoResizeTextarea 
+                                            value={metadata.title || ''} 
+                                            onChange={(e: any) => handleTitleChange(e.target.value)} 
+                                            placeholder="TITEL HIER EINGEBEN..." 
+                                            className="w-full text-4xl md:text-6xl lg:text-7xl font-display font-bold text-white leading-[1.1] px-6 mb-8 uppercase tracking-tighter italic placeholder:text-white/20 focus:outline-none border-none bg-transparent text-center resize-none flex items-center justify-center" 
+                                        />
+                                    </div>
+                                    <div className="flex flex-wrap justify-center items-center gap-6 text-[10px] text-slate-500 border-y border-white/5 py-6 mb-8 uppercase font-bold tracking-widest w-full">
+                                        <div className="flex items-center">
+                                            <div className="w-8 h-8 rounded-full bg-slate-800 overflow-hidden mr-3">
+                                                <img src={`https://ui-avatars.com/api/?name=${metadata.author}&background=random`} alt={metadata.author} className="w-full h-full object-cover"/>
                                             </div>
-                                            <div className="text-[10px] text-slate-400">Renders as embedded video player</div>
-                                        </div>
-                                    )}
-
-                                    {block.type === 'gallery' && (
-                                        <div className="my-6 bg-slate-50 p-4 rounded-lg border border-slate-200 border-dashed">
-                                            <div className="flex items-center space-x-2 mb-2">
-                                                <Layers size={16} className="text-slate-400" />
-                                                <span className="text-xs font-bold text-slate-500 uppercase">Gallery Images</span>
+                                            <div className="text-left">
+                                                <div className="text-slate-500">Written by</div>
+                                                <div className="text-white text-xs">{metadata.author}</div>
                                             </div>
-                                            <AutoTextarea
-                                                value={block.content}
-                                                onChange={(e: any) => updateBlockItems(block.id, e.target.value)}
-                                                className="w-full text-sm leading-relaxed text-slate-600 placeholder-slate-300 focus:outline-none bg-white border border-slate-200 rounded p-2 resize-none font-mono"
-                                                placeholder="Paste image URLs (one per line)..."
-                                                autoFocus={focusedBlockId === block.id}
-                                            />
                                         </div>
-                                    )}
+                                        <div className="w-px h-8 bg-white/5 hidden sm:block"></div>
+                                        <div className="flex items-center space-x-6">
+                                            <div className="flex items-center"><Calendar size={14} className="mr-2 text-f1-pink" /><span>{metadata.date || 'Heute'}</span></div>
+                                            {metadata.isUpdated && (<div className="flex items-center text-f1-pink font-bold"><RefreshCw size={14} className="mr-1.5" />Updated</div>)}
+                                            <div className="flex items-center"><Clock size={14} className="mr-2 text-f1-pink" /><span>{metadata.readTime || '3 min'}</span></div>
+                                        </div>
+                                    </div>
+                                </header>
 
-                                    {block.type === 'embed' && (
-                                        <div className="my-6 bg-slate-50 p-4 rounded-lg border border-slate-200 border-dashed">
-                                            <div className="flex items-center space-x-2 mb-2">
-                                                <Code size={16} className="text-slate-400" />
-                                                <span className="text-xs font-bold text-slate-500 uppercase">HTML Embed Code</span>
+                                <div className={`max-w-6xl mx-auto mb-12 ${activeDevice === 'mobile' ? 'px-0' : 'px-0 md:px-4'}`}>
+                                    <div className="group relative">
+                                        {metadata.image ? (
+                                            <div className={`relative w-full aspect-video overflow-hidden shadow-2xl transition-all border border-white/5 group bg-f1-card ${activeDevice === 'mobile' ? '' : 'md:rounded-2xl'}`}>
+                                                <img src={metadata.image} className="w-full h-full object-cover opacity-95" alt="Cover" />
+                                                <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity z-20"><button onClick={() => setMediaPickerTarget({ clientId: 'post_image' })} className="bg-white/90 backdrop-blur text-slate-900 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-white shadow-sm transition-colors">Bild ändern</button><button onClick={() => handleMetadataChange('image', '')} className="bg-red-500/90 backdrop-blur text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-red-600 shadow-sm transition-colors">Entfernen</button></div>
+                                                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent p-6 md:p-8 pt-20 z-10 flex justify-between items-end">
+                                                    <div className="flex flex-col space-y-2 w-full max-w-2xl"><div className="flex items-center space-x-2"><Camera size={12} className="text-f1-pink" /><input value={metadata.heroCredits || ''} onChange={(e) => handleMetadataChange('heroCredits', e.target.value)} className="bg-transparent border-none focus:outline-none text-[10px] font-black uppercase tracking-[0.2em] text-white/70 placeholder:text-white/20 w-full font-sans" placeholder="CREDITS..." /></div><AutoResizeTextarea value={metadata.heroCaption || ''} onChange={(e) => handleMetadataChange('heroCaption', e.target.value)} className="w-full bg-transparent border-none focus:outline-none text-2xl font-bold text-white placeholder:text-white/10 leading-none italic resize-none font-display" placeholder="BILDBESCHREIBUNG..." /></div>
+                                                </div>
                                             </div>
-                                            <AutoTextarea
-                                                value={block.content}
-                                                onChange={(e: any) => updateBlockContent(block.id, e.target.value)}
-                                                className="w-full text-xs leading-relaxed text-slate-600 placeholder-slate-300 focus:outline-none bg-white border border-slate-200 rounded p-2 resize-none font-mono"
-                                                placeholder="<iframe ...></iframe>"
-                                                autoFocus={focusedBlockId === block.id}
-                                            />
-                                        </div>
-                                    )}
-
+                                        ) : (
+                                            <button onClick={() => setMediaPickerTarget({ clientId: 'post_image' })} className="w-full aspect-video rounded-2xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center text-slate-400 hover:text-f1-pink hover:border-f1-pink/50 transition-all group/btn"><ImageIcon size={48} className="mb-2 opacity-20 group-hover/btn:scale-110 transition-transform" /><span className="text-xs font-bold uppercase tracking-widest">Titelbild hinzufügen</span></button>
+                                        )}
+                                    </div>
                                 </div>
 
-                                {/* Inserter between blocks */}
-                                <AddBlockMenu index={index} />
+                                <div className={`container mx-auto px-4 lg:max-w-6xl flex flex-col gap-12 ${(previewWidth === '100%' || (typeof previewWidth === 'number' && previewWidth >= 1024)) ? 'lg:flex-row' : ''}`}>
+                                    <aside className={`flex-col w-20 sticky top-32 h-fit items-center space-y-6 pt-12 opacity-60 pointer-events-none select-none ${(previewWidth === '100%' || (typeof previewWidth === 'number' && previewWidth >= 1024)) ? 'hidden lg:flex' : 'hidden'}`}><div className="text-[10px] font-bold uppercase -rotate-90 mb-10 text-slate-400 tracking-widest whitespace-nowrap">Share Article</div><button className="p-3 rounded-full bg-white/5 text-slate-400 shadow-sm border border-white/5"><Facebook size={20} /></button><button className="p-3 rounded-full bg-white/5 text-slate-400 shadow-sm border border-white/5"><Twitter size={20} /></button><button className="p-3 rounded-full bg-white/5 text-slate-400 shadow-sm border border-white/5"><Linkedin size={20} /></button><button className="p-3 rounded-full bg-white/5 text-slate-400 shadow-sm border border-white/5"><Copy size={20} /></button><div className="w-px h-20 bg-white/10 my-4"></div><div className="flex flex-col items-center"><MessageSquare size={20} className="text-f1-pink mb-1" /><span className="text-xs font-bold text-white">{metadata.commentCount || 0}</span></div></aside>
+                                    <div className="flex-1 max-w-3xl mx-auto w-full">
+                                        <AutoResizeTextarea value={metadata.excerpt || ''} onChange={(e) => handleMetadataChange('excerpt', e.target.value)} placeholder="Lead / Einleitungstext schreiben..." className="w-full text-xl md:text-2xl font-serif leading-relaxed text-slate-300 mb-10 border-b border-white/10 pb-10 focus:outline-none border-none bg-transparent placeholder:text-white/20 resize-none first-letter:text-5xl first-letter:font-bold first-letter:text-f1-pink first-letter:mr-2 first-letter:float-left" />
+                                        <BlockList blocks={blocks} />
+                                        <div className="mt-16 pt-8 border-t border-white/10 opacity-50 select-none pointer-events-none grayscale">
+                                            <h4 className="text-xs font-bold uppercase text-slate-400 mb-4 tracking-widest">Related Topics</h4>
+                                            <div className="flex flex-wrap gap-2">
+                                                {(metadata.tags || ['Placeholder']).map(tag => (<button key={tag} className="px-3 py-1 sm:px-4 sm:py-2 bg-white/5 text-slate-400 rounded-lg text-[9px] sm:text-xs font-bold uppercase tracking-wider border border-white/5">#{tag}</button>))}
+                                            </div>
+                                        </div>
+                                        <div className="mt-12 bg-white/5 p-8 rounded-2xl flex flex-col md:flex-row items-center md:items-start text-center md:text-left gap-6 opacity-60 select-none pointer-events-none grayscale border border-white/5"><div className="w-20 h-20 rounded-full overflow-hidden border-4 border-slate-700 shadow-md flex-shrink-0 bg-slate-800"></div><div><div className="text-xs font-bold uppercase text-f1-pink tracking-widest mb-1">About the Author</div><h3 className="text-xl font-display font-bold text-white mb-2">{metadata.author}</h3><p className="text-sm text-slate-400 leading-relaxed">Senior Formula 1 Editor covering the paddock since 2018...</p></div></div>
+                                        <div className={`mt-12 p-8 border rounded-2xl text-center transition-all duration-300 ${enableComments ? 'border-white/10 bg-white/5' : 'border-dashed border-white/10 bg-transparent opacity-40 grayscale'}`}><MessageSquare size={32} className={`mx-auto mb-4 ${enableComments ? 'text-f1-pink' : 'text-slate-500'}`} /><h3 className={`text-xl font-display font-bold ${enableComments ? 'text-white' : 'text-slate-500'}`}>{enableComments ? 'Kommentar-Sektion: Aktiv' : 'Kommentar-Sektion: Deaktiviert'}</h3><p className="text-slate-400 mb-6 text-sm">{enableComments ? 'Besucher können unter diesem Artikel kommentieren.' : 'Die Kommentar-Funktion ist für diesen Artikel ausgeschaltet.'}</p>{enableComments && (<div className="bg-f1-pink text-white px-8 py-3 rounded-full text-xs font-bold uppercase tracking-widest inline-block opacity-50 cursor-default">Kommentar schreiben (Vorschau)</div>)}</div>
+                                    </div>
+                                    {showRightSidebar && (
+                                        <aside className={`shrink-0 opacity-60 pointer-events-none grayscale select-none w-72 ${(previewWidth === '100%' || (typeof previewWidth === 'number' && previewWidth >= 1280)) ? 'hidden xl:block' : 'hidden'}`}><div className="sticky top-24">{showLatestNews && (<><div className="flex items-center mb-6"><div className="w-1 h-4 bg-f1-pink rounded-full mr-3"></div><h3 className="text-sm font-bold uppercase tracking-widest text-white">Latest News</h3></div><div className="space-y-6">{[1,2,3].map(i => (<div key={i} className="group cursor-pointer"><div className="text-[10px] text-slate-400 mb-1 flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-f1-pink mr-2"></span>{i * 15} MIN AGO</div><h4 className="text-sm font-bold text-slate-300 leading-snug group-hover:text-f1-pink transition-colors">Toto Wolff warns about 2026 regulations loopholes</h4></div>))}</div></>)}{showNextRace && (<div className="mt-12 p-6 bg-f1-card border border-white/10 rounded-xl text-white text-center relative overflow-hidden"><div className="relative z-10"><div className="text-xs font-bold text-f1-pink uppercase tracking-widest mb-2">Next Race</div><div className="text-2xl font-display font-bold mb-1">Bahrain GP</div><div className="text-sm text-slate-400">11.02.2026</div><button className="mt-4 w-full py-2 bg-white/10 hover:bg-white/20 rounded text-xs font-bold uppercase transition-colors">Race Center</button></div></div>)}</div></aside>
+                                    )}
+                                </div>
                             </div>
-                        ))}
-
-                        {/* Fallback empty add area at bottom */}
-                        {blocks.length === 0 && (
-                             <button type="button" onClick={() => addBlock('paragraph')} className="w-full py-8 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 hover:border-f1-pink hover:text-f1-pink transition-colors flex flex-col items-center justify-center">
-                                <Plus size={24} className="mb-2" />
-                                <span>Start writing or type / to choose a block</span>
-                             </button>
-                        )}
-                    </div>
+                        </div>
+                    </main>
                 </div>
             </div>
-
-        </div>
-      </form>
-    </div>
-  );
+        </EditorContext.Provider>
+    );
 };
 
 export default PostEditor;

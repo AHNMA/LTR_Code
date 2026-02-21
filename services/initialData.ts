@@ -62,6 +62,30 @@ export const INITIAL_USERS: User[] = [
     joinedDate: '2025-02-12',
     socials: {},
     isVerified: true
+  },
+  {
+    id: '6',
+    username: 'it_support',
+    email: 'it@poleposition.com',
+    firstName: 'Toni',
+    lastName: 'Technik',
+    avatar: 'https://ui-avatars.com/api/?name=Toni+Technik',
+    role: 'it',
+    joinedDate: '2025-02-20',
+    socials: {},
+    isVerified: true
+  },
+  {
+    id: '7',
+    username: 'autor_f1',
+    email: 'autor@poleposition.com',
+    firstName: 'Axel',
+    lastName: 'Autor',
+    avatar: 'https://ui-avatars.com/api/?name=Axel+Autor',
+    role: 'author',
+    joinedDate: '2025-02-21',
+    socials: {},
+    isVerified: true
   }
 ];
 
@@ -218,6 +242,7 @@ export const INITIAL_MEDIA: MediaItem[] = [
     createMediaItem('https://upload.wikimedia.org/wikipedia/en/thumb/6/66/McLaren_Racing_logo.svg/1200px-McLaren_Racing_logo.svg.png', 'McLaren Logo'),
     createMediaItem('https://media.formula1.com/d_team_car_fallback_image.png/content/dam/fom-website/teams/2024/red-bull-racing.png', 'RB Car'),
     createMediaItem('https://media.formula1.com/d_team_car_fallback_image.png/content/dam/fom-website/teams/2024/mclaren.png', 'McLaren Car'),
-    createMediaItem('https://picsum.photos/800/600?random=1', 'Article Hero 1'),
-    createMediaItem('https://picsum.photos/600/400?random=10', 'Article Thumb 1'),
+    createMediaItem('https://picsum.photos/800/600?random=1', 'Random 1'),
+    createMediaItem('https://picsum.photos/100/100?random=2', 'Random 2'),
+    createMediaItem('https://picsum.photos/600/400?random=10', 'Random 3')
 ];

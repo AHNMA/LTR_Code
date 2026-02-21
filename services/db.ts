@@ -62,4 +62,9 @@ db.version(7).stores({}).upgrade(tx => {
     // No schema changes, just version bump to force sync check
 });
 
+// Version 8: Add authorId index to posts table to support queries by author
+db.version(8).stores({
+  posts: 'id, section, date, authorId'
+});
+
 export { db };
