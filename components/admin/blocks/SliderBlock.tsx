@@ -3,6 +3,7 @@ import React from 'react';
 import { Play, Image as ImageIcon, Crop, X, Plus, ChevronLeft, ChevronRight, Camera, Maximize, Layout } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import { normalizeGalleryImages } from './GalleryBlock';
 import AutoResizeTextarea from '../editor/AutoResizeTextarea';
 
@@ -13,7 +14,7 @@ export const sliderDefaults = {
 };
 
 export const SliderEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { updateBlock, setMediaPickerTarget } = useEditor();
+    const { updateBlock, setMediaPickerTarget, selectedBlockId } = useEditor();
     
     const rawImages = block.attributes?.images || [];
     const images = normalizeGalleryImages(rawImages);
@@ -44,7 +45,9 @@ export const SliderEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     };
 
     return (
-        <div className={`space-y-4 w-full font-display italic`}>
+        <div>
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+            <div className={`space-y-4 w-full font-display italic`}>
             {/* Main Stage - Unified Card Design */}
             <div className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/10 group/slider">
                 
@@ -158,6 +161,7 @@ export const SliderEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
                 </div>
             )}
         </div>
+    </div>
     );
 };
 

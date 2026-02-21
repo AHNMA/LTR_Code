@@ -3,10 +3,11 @@ import React from 'react';
 import { AlignLeft, AlignCenter, AlignRight, User } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import AutoResizeTextarea from '../editor/AutoResizeTextarea';
 
 export const CommentEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { updateBlock } = useEditor();
+    const { updateBlock, selectedBlockId } = useEditor();
     const { blockSize = 'full', align = 'center', style = 'card' } = block.attributes;
     const isCard = style === 'card';
 
@@ -27,7 +28,9 @@ export const CommentEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     // 1. STYLE: SIMPLE (Minimalist, Left Border)
     if (!isCard) {
         return (
-            <div className="w-full border-l-4 border-f1-pink pl-6 py-4 font-display italic">
+            <div>
+                <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+                <div className="w-full border-l-4 border-f1-pink pl-6 py-4 font-display italic">
                 <div className="flex items-center mb-2">
                     <div className="bg-f1-pink text-white text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-widest mr-3 font-sans">
                         {block.attributes.author || 'AUTOR'}
@@ -47,13 +50,16 @@ export const CommentEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
                     className="bg-transparent text-slate-500 font-bold text-xs uppercase mt-2 outline-none w-full placeholder:text-slate-600 tracking-wider font-sans" 
                     placeholder="Name / Rolle eingeben..."
                 />
+                </div>
             </div>
         );
     }
 
     // 2. STYLE: CARD (Matches ListBlock Aesthetic)
     return (
-        <div className={`bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 font-display italic ${widthClass} ${alignClass} group/comment`}>
+        <div>
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+            <div className={`bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 font-display italic ${widthClass} ${alignClass} group/comment`}> 
             
             {/* Header: Author Input (Similar to List Title) */}
             <div className="p-6 pb-2 border-b border-white/5 bg-white/5 flex items-center justify-between">
@@ -82,6 +88,7 @@ export const CommentEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
                     />
                 </div>
             </div>
+                </div>
         </div>
     );
 };

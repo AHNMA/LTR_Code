@@ -3,11 +3,12 @@ import React, { useState } from 'react';
 import { Image as ImageIcon, Crop, Camera } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import AutoResizeTextarea from '../editor/AutoResizeTextarea';
 
 // --- Editor Component ---
 export const ImageEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { updateBlock, setMediaPickerTarget } = useEditor();
+    const { updateBlock, setMediaPickerTarget, selectedBlockId } = useEditor();
     
     const { 
         url, credits, alt,
@@ -35,7 +36,9 @@ export const ImageEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     }
 
     return (
-        <div className="relative group/img transition-all duration-500 font-display italic w-full">
+        <div>
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+            <div className="relative group/img transition-all duration-500 font-display italic w-full">
             {url ? (
                 <div className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/10 group/container">
                     {/* Image Area */}
@@ -97,6 +100,7 @@ export const ImageEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
                     <span className="font-black text-xs uppercase tracking-widest font-sans">Bild aus Bibliothek wählen</span>
                 </div>
             )}
+        </div>
         </div>
     );
 };

@@ -11,7 +11,9 @@ import {
   Edit3, ExternalLink, SlidersHorizontal
 } from 'lucide-react';
 import MediaLibrary from './MediaLibrary';
+import { useViewMode } from '../../contexts/ViewModeContext';
 import FrontendBlockRenderer from '../article/BlockRenderer';
+import ArticleShell from '../article/ArticleShell';
 import { EditorContext } from './editor/EditorContext';
 import { BlockRegistry, getBlockModule } from './BlockRegistry';
 import AutoResizeTextarea from './editor/AutoResizeTextarea';
@@ -111,7 +113,7 @@ const DeviceToolbar: React.FC<DeviceToolbarProps> = ({ activeDevice, previewWidt
 };
 
 const BlockWrapper: React.FC<{ block: ContentBlock, index: number, isSelected: boolean }> = ({ block, index, isSelected }) => {
-    const { setSelectedBlockId, moveBlock, removeBlock } = React.useContext(EditorContext)!;
+    const { setSelectedBlockId, moveBlock, removeBlock, updateBlock, selectedBlockId } = React.useContext(EditorContext)!;
 
     const module = getBlockModule(block.type);
     const EditorComponent = module ? module.Editor : null;
@@ -158,7 +160,13 @@ const BlockWrapper: React.FC<{ block: ContentBlock, index: number, isSelected: b
                 </div>
             )}
             <div className="p-2 min-h-[40px]">
-                {EditorComponent ? <EditorComponent block={block} /> : <div className="p-4 bg-slate-50 rounded border border-slate-200 text-center italic">Block type {block.type} not found</div>}
+                {/* Render the unified BlockRenderer for WYSIWYG parity. When in-editor, make it editable and wire update callbacks. */}
+                <FrontendBlockRenderer
+                    block={block}
+                    editable={true}
+                    selectedBlockId={selectedBlockId}
+                    onUpdateBlock={(id, attrs) => updateBlock(id, attrs)}
+                />
             </div>
         </div>
     );
@@ -251,22 +259,22 @@ const PostEditor: React.FC<{ post?: Post, onSave: (post: Post) => void, onCancel
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
 
-    const [activeDevice, setActiveDevice] = useState<'mobile' | 'tablet' | 'desktop' | 'custom'>('desktop');
-    const [previewWidth, setPreviewWidth] = useState<number | '100%'>('100%');
+    const { activeDevice, setActiveDevice, viewportWidth, setViewportWidth } = useViewMode();
+    const previewWidth = viewportWidth;
 
     const handleDeviceChange = (mode: 'mobile' | 'tablet' | 'desktop') => {
         setActiveDevice(mode);
-        if (mode === 'mobile') setPreviewWidth(375);
-        if (mode === 'tablet') setPreviewWidth(768);
-        if (mode === 'desktop') setPreviewWidth('100%');
+        if (mode === 'mobile') setViewportWidth(375);
+        if (mode === 'tablet') setViewportWidth(768);
+        if (mode === 'desktop') setViewportWidth('100%');
     };
 
     const handleWidthChange = (width: number) => {
         if (!isNaN(width) && width > 0) {
-            setPreviewWidth(width);
+            setViewportWidth(width);
             setActiveDevice('custom');
         } else if (isNaN(width)) {
-            setPreviewWidth('100%');
+            setViewportWidth('100%');
             setActiveDevice('desktop');
         }
     };
@@ -562,7 +570,8 @@ const PostEditor: React.FC<{ post?: Post, onSave: (post: Post) => void, onCancel
 
                             <div className="flex-1 overflow-y-auto overflow-x-auto flex justify-center py-8">
                                 <div className={`transition-all duration-300 bg-f1-dark shadow-2xl relative shrink-0 border border-white/10 @container ${activeDevice !== 'desktop' ? 'overflow-hidden' : ''}`} style={{ width: previewWidth === '100%' ? '100%' : `${previewWidth}px`, maxWidth: previewWidth === '100%' ? '100%' : 'none', minHeight: '100%', height: 'fit-content', borderRadius: activeDevice === 'mobile' ? '40px' : activeDevice === 'tablet' ? '12px' : '0', borderWidth: activeDevice === 'mobile' ? '8px' : activeDevice === 'tablet' ? '4px' : '0', borderColor: activeDevice !== 'desktop' ? '#262626' : 'transparent' }}>
-                                    <article className="bg-f1-dark min-h-full pb-20 font-sans" onClickCapture={handlePreviewClick}>
+                                                                        <ArticleShell skipNavigation>
+                                                                            <article className="bg-f1-dark min-h-full pb-20 font-sans" onClickCapture={handlePreviewClick}>
                                         <div className="container mx-auto px-4 py-4 flex items-center text-xs text-slate-500 uppercase font-bold tracking-wider">
                                             <span className="text-slate-400">Home</span>
                                             <ChevronRight size={12} className="mx-2 shrink-0" />
@@ -640,7 +649,8 @@ const PostEditor: React.FC<{ post?: Post, onSave: (post: Post) => void, onCancel
                                                 <aside className={`w-72 shrink-0 ${(previewWidth === '100%' || (typeof previewWidth === 'number' && previewWidth >= 1280)) ? 'hidden xl:block' : 'hidden'}`}><div className="sticky top-24">{showLatestNews && (<><div className="flex items-center mb-6"><div className="w-1 h-4 bg-f1-pink rounded-full mr-3"></div><h3 className="text-sm font-bold uppercase tracking-widest text-white">Latest News</h3></div><div className="space-y-6">{[1,2,3].map(i => (<div key={i} className="group cursor-pointer"><div className="text-[10px] text-slate-400 mb-1 flex items-center"><span className="w-1.5 h-1.5 rounded-full bg-f1-pink mr-2"></span>{i * 15} MIN AGO</div><h4 className="text-sm font-bold text-slate-200 leading-snug group-hover:text-f1-pink transition-colors">Toto Wolff warns about 2026 regulations loopholes</h4></div>))}</div></>)}{showNextRace && (<div className="mt-12 p-6 bg-f1-card border border-white/10 rounded-xl text-white text-center relative overflow-hidden"><div className="relative z-10"><div className="text-xs font-bold text-f1-pink uppercase tracking-widest mb-2">Next Race</div><div className="text-2xl font-display font-bold mb-1">Bahrain GP</div><div className="text-sm text-slate-400">11.02.2026</div><button className="mt-4 w-full py-2 bg-white/10 hover:bg-white/20 rounded text-xs font-bold uppercase transition-colors">Race Center</button></div></div>)}</div></aside>
                                             )}
                                         </div>
-                                    </article>
+                                                                            </article>
+                                                                        </ArticleShell>
                                 </div>
                             </div>
                         </div>

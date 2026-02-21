@@ -3,6 +3,7 @@ import React from 'react';
 import { Info, AlignLeft, AlignCenter, AlignRight, ChevronDown, CheckSquare, Square } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import AutoResizeTextarea from '../editor/AutoResizeTextarea';
 
 export const detailsDefaults = { 
@@ -15,7 +16,7 @@ export const detailsDefaults = {
 };
 
 export const DetailsEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { updateBlock } = useEditor();
+    const { updateBlock, selectedBlockId } = useEditor();
     
     const { blockSize = 'full', align = 'center', style = 'card' } = block.attributes;
     const isCard = style === 'card';
@@ -43,7 +44,9 @@ export const DetailsEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     // Simple Style (Light -> Adapted for Dark Mode)
     if (!isCard) {
         return (
-            <div className={`group/details bg-transparent border-l-4 border-f1-pink pl-6 py-3 w-full`}>
+            <div>
+                <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+                <div className={`group/details bg-transparent border-l-4 border-f1-pink pl-6 py-3 w-full`}>
                 <div className="flex items-center">
                     <AutoResizeTextarea
                         value={block.attributes.summary || ''}
@@ -59,6 +62,7 @@ export const DetailsEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
                         className={`w-full bg-transparent focus:outline-none text-slate-300 leading-relaxed font-display font-bold uppercase tracking-wide placeholder:text-white/20 ${contentTextSize}`}
                         placeholder="Inhalt..."
                     />
+                </div>
                 </div>
             </div>
         );

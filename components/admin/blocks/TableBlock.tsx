@@ -3,6 +3,7 @@ import React from 'react';
 import { AlignLeft, AlignCenter, AlignRight, Layout, Table as TableIcon } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import AutoResizeTextarea from '../editor/AutoResizeTextarea';
 
 export const tableDefaults = { 
@@ -16,7 +17,7 @@ export const tableDefaults = {
 };
 
 export const TableEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { updateBlock } = useEditor();
+    const { updateBlock, selectedBlockId } = useEditor();
     const headers = block.attributes.headers || [];
     const rows = block.attributes.rows || [];
     
@@ -45,7 +46,9 @@ export const TableEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     // Simple Style (Light Mode -> Adapted for Dark Mode Editor)
     if (!isCard) {
         return (
-            <div className={`overflow-x-auto bg-transparent border-l-4 border-f1-pink pl-4 py-2 w-full`}>
+            <div>
+                <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+                <div className={`overflow-x-auto bg-transparent border-l-4 border-f1-pink pl-4 py-2 w-full`}>
                 {/* Header for Simple Table */}
                 <div className="mb-4">
                     <AutoResizeTextarea
@@ -97,6 +100,7 @@ export const TableEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
                         ))}
                     </tbody>
                 </table>
+                </div>
             </div>
         );
     }

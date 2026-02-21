@@ -222,6 +222,17 @@ export interface ContentBlock {
   innerBlocks: ContentBlock[];
 }
 
+// Props shared by the BlockRenderer component used across editor/preview/frontend
+export interface BlockRendererProps {
+  block: ContentBlock;
+  /** When true the renderer should expose editing affordances but keep visual parity */
+  editable?: boolean;
+  /** Currently selected block clientId in editor mode (optional) */
+  selectedBlockId?: string | null;
+  /** Called when inline edits change block attributes */
+  onUpdateBlock?: (clientId: string, attributes: Partial<BlockAttributes>) => void;
+}
+
 export type PostSection = 'highlight' | 'aktuell' | 'updated' | 'trending' | 'ausgewählt' | 'feed';
 export type PostStatus = 'published' | 'draft';
 

@@ -3,6 +3,7 @@ import React from 'react';
 import { List as ListIcon, ListOrdered, Plus, Trash2, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import AutoResizeTextarea from '../editor/AutoResizeTextarea';
 
 export const listDefaults = { 
@@ -15,7 +16,7 @@ export const listDefaults = {
 };
 
 export const ListEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { updateBlock } = useEditor();
+    const { updateBlock, selectedBlockId } = useEditor();
     const { ordered, blockSize, align, style = 'card', title } = block.attributes;
     const isCard = style === 'card';
     
@@ -122,6 +123,9 @@ export const ListEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     if (!isCard) {
         return (
             <div className={`py-4 pl-6 border-l-4 border-f1-pink w-full`}>
+                <div className="mb-6">
+                    <BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} />
+                </div>
                 {/* Header for Simple List */}
                 <div className="mb-4">
                     <AutoResizeTextarea
@@ -180,7 +184,11 @@ export const ListEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
 
     // Card Style (Dark, Driver Block aesthetic)
     return (
-        <div className={`bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 font-display italic ${widthClass} ${alignClass}`}>
+        <div>
+            <div className="mb-6">
+                <BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} />
+            </div>
+            <div className={`bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 font-display italic ${widthClass} ${alignClass}`}>
             
             {/* Header Input for Card */}
             <div className="p-6 pb-2 border-b border-white/5 bg-white/5">
@@ -246,6 +254,7 @@ export const ListEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
             >
                 Eintrag hinzufügen
             </button>
+            </div>
         </div>
     );
 };

@@ -3,10 +3,12 @@ import React from 'react';
 import { Trophy, Calculator, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import { useData } from '../../../contexts/DataContext';
 
 export const TitleWatchEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     const { drivers, teams, races } = useData();
+    const { updateBlock, selectedBlockId } = useEditor();
     const { type = 'drivers', style = 'card', blockSize = 'medium', align = 'center' } = block.attributes;
     const isDrivers = type === 'drivers';
     
@@ -26,7 +28,9 @@ export const TitleWatchEditor: React.FC<{ block: ContentBlock }> = ({ block }) =
 
     if (!isCard) {
         return (
-            <div className="w-full border-l-4 border-f1-pink pl-6 py-4 bg-white/50 font-display italic">
+            <div>
+                <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+                <div className="w-full border-l-4 border-f1-pink pl-6 py-4 bg-white/50 font-display italic">
                 <div className="flex items-center space-x-3 mb-4 not-italic">
                     <Calculator className="text-f1-pink" size={24} />
                     <h4 className="text-2xl font-black text-slate-900 uppercase italic leading-none tracking-tight">Title Watch</h4>
@@ -44,6 +48,7 @@ export const TitleWatchEditor: React.FC<{ block: ContentBlock }> = ({ block }) =
                             </div>
                         );
                     })}
+                </div>
                 </div>
             </div>
         );

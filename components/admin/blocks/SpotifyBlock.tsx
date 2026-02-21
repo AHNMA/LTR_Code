@@ -2,6 +2,7 @@ import React from 'react';
 import { Music, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 
 const extractSpotifyUrl = (input: string) => {
     if (!input) return '';
@@ -14,30 +15,11 @@ const extractSpotifyUrl = (input: string) => {
 };
 
 export const SpotifyEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { url, blockSize = 'medium', align = 'center' } = block.attributes;
-    const sizeClass = { 'small': 'max-w-md', 'medium': 'max-w-2xl', 'large': 'max-w-4xl' }[blockSize as string] || 'max-w-2xl';
-    const alignClass = { 'left': 'mr-auto', 'center': 'mx-auto', 'right': 'ml-auto' }[align as string] || 'mx-auto';
+    const { updateBlock, selectedBlockId } = useEditor();
 
     return (
-        <div className={`w-full ${sizeClass} ${alignClass}`}>
-            {url ? (
-                <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-200 bg-white">
-                    <iframe 
-                        src={url} 
-                        width="100%" 
-                        height="152" 
-                        frameBorder="0" 
-                        allow="encrypted-media" 
-                        loading="lazy"
-                        className="pointer-events-none"
-                    ></iframe>
-                </div>
-            ) : (
-                <div className="p-8 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl text-center flex flex-col items-center justify-center text-slate-400">
-                    <Music size={32} className="mb-2 text-green-500" />
-                    <span className="text-xs font-bold uppercase">Spotify hinzufügen</span>
-                </div>
-            )}
+        <div>
+            <BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} />
         </div>
     );
 };

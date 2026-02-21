@@ -3,16 +3,20 @@ import React from 'react';
 import { Trophy } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import { useData } from '../../../contexts/DataContext';
 
 export const ResultsEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     const { drivers, races, getSessionResult } = useData();
+    const { updateBlock, selectedBlockId } = useEditor();
     const race = races.find(r => r.id === block.attributes.id);
     if (!race) return <div className="p-4 border border-slate-200 rounded-2xl text-center text-slate-400 text-xs bg-white font-sans italic">Rennen für Ergebnisse wählen...</div>;
     const result = getSessionResult(race.id, block.attributes?.sessionId || 'race');
     const list = result?.entries?.slice(0, 5) || [];
     return (
-        <div className="bg-f1-card rounded-2xl overflow-hidden border border-white/10 font-sans">
+        <div>
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+            <div className="bg-f1-card rounded-2xl overflow-hidden border border-white/10 font-sans">
             <div className="p-3 bg-white/10 flex justify-between items-center"><div className="text-white font-bold text-sm flex items-center"><Trophy size={14} className="mr-2 text-f1-pink"/> {race.country} GP Results</div><div className="text-[10px] uppercase text-white/50">{block.attributes.sessionId}</div></div>
             <div className="divide-y divide-white/5">
                 {list.map((e, i) => (
@@ -23,6 +27,7 @@ export const ResultsEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
                     </div>
                 ))}
                 {list.length === 0 && <div className="p-4 text-center text-white/30 text-xs">Keine Daten</div>}
+            </div>
             </div>
         </div>
     );

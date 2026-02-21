@@ -3,12 +3,14 @@ import React from 'react';
 import { Calendar, MapPin, Zap, Clock, Info, Trophy, Flag as FlagIcon } from 'lucide-react';
 import { ContentBlock, Race, SessionType } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import { useData } from '../../../contexts/DataContext';
 import { getFlagUrl } from '../../../constants';
 import { DottedGlowBackground } from '../../ui/DottedGlowBackground';
 
 export const EventEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     const { races } = useData();
+    const { updateBlock, selectedBlockId } = useEditor();
     const { id, style = 'card' } = block.attributes;
     
     const race = races.find(r => r.id === id);
@@ -52,6 +54,7 @@ export const EventEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
 
     return (
         <div className="w-full font-display italic">
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
             <div className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 relative cursor-pointer group">
                 
                 {/* Header Section */}

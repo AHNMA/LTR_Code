@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 
 export const headingDefaults = { 
     content: '', 
@@ -14,7 +15,7 @@ export const headingDefaults = {
 const MAX_CHARS = 35;
 
 export const HeadingEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { updateBlock } = useEditor();
+    const { updateBlock, selectedBlockId } = useEditor();
     const ref = useRef<HTMLDivElement>(null);
     
     const { blockSize = 'full', align = 'center', level = 2 } = block.attributes;
@@ -87,7 +88,9 @@ export const HeadingEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     };
 
     return (
-        <div className={`relative flex items-stretch transition-all duration-300 group/heading ${widthClass} ${alignClass}`}>
+        <div>
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+            <div className={`relative flex items-stretch transition-all duration-300 group/heading ${widthClass} ${alignClass}`}>
             <div className="w-3 bg-f1-pink mr-4 shrink-0 skew-x-[-12deg] mt-[-1px] mb-[9px]" />
             <div
                 ref={ref}
@@ -103,8 +106,9 @@ export const HeadingEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
                 }}
                 data-placeholder={`ÜBERSCHRIFT (MAX ${MAX_CHARS})`}
             />
-        </div>
-    );
+            </div>
+            </div>
+        );
 };
 
 export const HeadingInspector: React.FC<{ block: ContentBlock }> = ({ block }) => {

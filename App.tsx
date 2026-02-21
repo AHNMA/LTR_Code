@@ -9,6 +9,7 @@ import { syncService } from './services/sync';
 import { INITIAL_USERS, INITIAL_TEAMS, INITIAL_DRIVERS, INITIAL_RACES, INITIAL_MEDIA } from './services/initialData';
 import { INITIAL_POSTS } from './constants';
 import Header from './components/Header';
+import { ViewModeProvider } from './contexts/ViewModeContext';
 import DriverTicker from './components/DriverTicker';
 import HeroSection from './components/HeroSection';
 import SectionTitle from './components/SectionTitle';
@@ -135,4 +136,12 @@ function App() {
   );
 }
 
-export default App;
+export default function AppWrapper() {
+  return (
+    <ViewModeProvider>
+      <App />
+    </ViewModeProvider>
+  );
+}
+
+// App is intentionally exported as a named component; default export is AppWrapper above.

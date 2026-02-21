@@ -374,7 +374,7 @@ const RichTextToolbar: React.FC<RichTextToolbarProps> = ({
             <div className="w-px h-4 bg-slate-200 mx-1"></div>
             {onFontChange && currentFont && (
                 <button onMouseDown={(e) => {e.preventDefault(); onFontChange(currentFont === 'display' ? 'sans' : 'display')}} className={`p-1.5 rounded transition-colors text-xs font-bold uppercase flex items-center ${currentFont === 'display' ? 'bg-slate-100 text-f1-pink' : 'text-slate-500 hover:bg-slate-50'}`}>
-                    <TypeIcon size={14} className="mr-1" /> {currentFont === 'display' ? 'Teko' : 'Inter'}
+                    <TypeIcon size={14} className="mr-1" /> {currentFont === 'display' ? 'Exo 2' : 'Inter'}
                 </button>
             )}
             {onToggleViewMode && (

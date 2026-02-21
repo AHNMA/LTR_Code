@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ContentBlock, Driver, Team, Race } from '../../types';
+import { ContentBlock, Driver, Team, Race, BlockAttributes, BlockRendererProps } from '../../types';
 import { useData } from '../../contexts/DataContext';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { BLOCK_SPACINGS } from '../../constants';
@@ -7,16 +7,12 @@ import {
     Quote, Trophy, MapPin, Calculator, BarChart2, Calendar, 
     ArrowRight, Flag, Zap, Clock, ChevronRight, ChevronDown, ChevronLeft,
     Instagram, Twitter, Facebook, MessageSquare, Info, CheckCircle,
-    Camera, List, X, User, Cpu
+    Camera, List, X, User, Cpu, Youtube, Music
 } from 'lucide-react';
 import { getFlagUrl } from '../../constants';
 import { DottedGlowBackground } from '../ui/DottedGlowBackground';
 
-interface BlockRendererProps {
-  block: ContentBlock;
-}
-
-const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
+const BlockRenderer: React.FC<BlockRendererProps> = ({ block, editable = false, selectedBlockId = null, onUpdateBlock }) => {
   const { drivers, teams, races, getSessionResult } = useData();
   const { goToDriver, goToTeam, goToCalendar, goToStandings } = useNavigation();
   
@@ -117,15 +113,32 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
   const renderContent = () => {
     switch (block.type) {
         case 'custom/paragraph': {
-            const fontClass = block.attributes.fontFamily === 'sans' 
-                ? 'font-sans font-light text-lg' 
+            const fontClass = block.attributes.fontFamily === 'sans'
+                ? 'font-sans font-light text-lg'
                 : 'font-display font-medium text-2xl tracking-wide';
-                
+
+            if (editable && onUpdateBlock) {
+                const isSelected = selectedBlockId === block.clientId;
+                return (
+                    <div
+                        contentEditable={isSelected}
+                        suppressContentEditableWarning
+                        onInput={(e) => {
+                            const el = e.currentTarget as HTMLDivElement;
+                            onUpdateBlock(block.clientId, { content: el.innerHTML });
+                        }}
+                        className={`cursor-text leading-relaxed text-slate-300 selection:bg-f1-pink/20 break-words hyphens-auto [&_a]:text-f1-pink [&_a]:font-bold [&_a]:underline [&_a]:decoration-2 [&_a]:underline-offset-4 [&_a]:hover:text-white [&_a]:transition-colors ${fontClass}`}
+                        style={{ textAlign: block.attributes?.textAlign }}
+                        dangerouslySetInnerHTML={{ __html: block.attributes?.content || '' }}
+                    />
+                );
+            }
+
             return (
-                <div 
-                    className={`leading-relaxed text-slate-300 selection:bg-f1-pink/20 [&_a]:text-f1-pink [&_a]:font-bold [&_a]:underline [&_a]:decoration-2 [&_a]:underline-offset-4 [&_a]:hover:text-white [&_a]:transition-colors ${fontClass} break-words hyphens-auto`} 
+                <div
+                    className={`leading-relaxed text-slate-300 selection:bg-f1-pink/20 [&_a]:text-f1-pink [&_a]:font-bold [&_a]:underline [&_a]:decoration-2 [&_a]:underline-offset-4 [&_a]:hover:text-white [&_a]:transition-colors ${fontClass} break-words hyphens-auto`}
                     style={{ textAlign: block.attributes?.textAlign }}
-                    dangerouslySetInnerHTML={{ __html: block.attributes?.content || '' }} 
+                    dangerouslySetInnerHTML={{ __html: block.attributes?.content || '' }}
                 />
             );
         }
@@ -155,7 +168,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                 <div className={`w-full ${sizeClass} ${alignClass} font-display italic`}>
                     <div 
                         className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 group cursor-pointer"
-                        onClick={() => goToDriver(driver.id)}
+                        onClick={() => { if (!editable) goToDriver(driver.id); }}
                     >
                         <div className="p-6 pb-2 border-b border-white/5 bg-white/5 flex items-center justify-between relative z-20">
                              <div className="w-full bg-transparent focus:outline-none text-white font-display font-black text-3xl uppercase italic tracking-tight flex items-center gap-3">
@@ -173,7 +186,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                             </div>
                             <div className="w-full @[1250px]:w-7/12 p-5 md:p-6 flex flex-col justify-center relative bg-f1-card z-20">
                                 <div className="flex items-center justify-between mb-6">
-                                    <div className="flex items-center space-x-3 group/team hover:opacity-80 transition-opacity" onClick={(e) => { e.stopPropagation(); if(team) goToTeam(team.id); }}>
+                                    <div className="flex items-center space-x-3 group/team hover:opacity-80 transition-opacity" onClick={(e) => { e.stopPropagation(); if (!editable && team) goToTeam(team.id); }}>
                                         <div className="w-1 h-6 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.2)]" style={{ backgroundColor: accentColor }}></div>
                                         <span className="text-2xl font-bold uppercase text-white/80 tracking-tight font-display italic group-hover/team:text-white group-hover/team:underline decoration-2 underline-offset-4 decoration-f1-pink translate-y-[2px]">{team?.name || 'No Team'}</span>
                                     </div>
@@ -190,14 +203,14 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                                             <span className="text-lg font-bold text-white uppercase">{driver.nationalityFlag}</span>
                                         </div>
                                     </div>
-                                    <div className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center hover:bg-white/20 hover:border-f1-pink/30 transition-all group/stat cursor-pointer relative z-30" onClick={(e) => { e.stopPropagation(); goToStandings(); }}>
+                                    <div className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center hover:bg-white/20 hover:border-f1-pink/30 transition-all group/stat cursor-pointer relative z-30" onClick={(e) => { e.stopPropagation(); if (!editable) goToStandings(); }}>
                                         <div className="flex items-center gap-1.5 mb-1 justify-center w-full">
                                             <Trophy size={10} className="text-f1-pink -translate-y-[1px]" />
                                             <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider font-sans not-italic group-hover/stat:text-white transition-colors">Rang</span>
                                         </div>
                                         <div className="text-lg font-black text-white uppercase transition-transform">P{driver.rank || '-'}</div>
                                     </div>
-                                    <div className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center hover:bg-white/20 hover:border-f1-pink/30 transition-all group/stat cursor-pointer relative z-30" onClick={(e) => { e.stopPropagation(); goToStandings(); }}>
+                                    <div className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center hover:bg-white/20 hover:border-f1-pink/30 transition-all group/stat cursor-pointer relative z-30" onClick={(e) => { e.stopPropagation(); if (!editable) goToStandings(); }}>
                                         <div className="flex items-center gap-1.5 mb-1 justify-center w-full">
                                             <BarChart2 size={10} className="text-f1-pink -translate-y-[1px]" />
                                             <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider font-sans not-italic group-hover/stat:text-white transition-colors">Punkte</span>
@@ -231,7 +244,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                 <div className="w-full mx-auto font-display italic">
                     <div 
                         className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 group cursor-pointer transition-all duration-500"
-                        onClick={() => goToTeam(team.id)}
+                        onClick={() => { if (!editable) goToTeam(team.id); }}
                     >
                         {/* Header - Team Name with Pink Hover */}
                         <div className="p-6 pb-2 border-b border-white/5 bg-white/5 relative z-20">
@@ -288,14 +301,14 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                                             <span className="text-lg font-bold text-white uppercase">{team.nationalityFlag}</span>
                                         </div>
                                     </div>
-                                    <div className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center hover:bg-white/20 hover:border-f1-pink/30 transition-all group/stat cursor-pointer relative z-30" onClick={(e) => { e.stopPropagation(); goToStandings(); }}>
+                                    <div className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center hover:bg-white/20 hover:border-f1-pink/30 transition-all group/stat cursor-pointer relative z-30" onClick={(e) => { e.stopPropagation(); if (!editable) goToStandings(); }}>
                                         <div className="flex items-center gap-1.5 mb-1 justify-center w-full">
                                             <Trophy size={10} className="text-f1-pink -translate-y-[1px]" />
                                             <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider font-sans not-italic group-hover/stat:text-white transition-colors">Rang</span>
                                         </div>
                                         <div className="text-lg font-black text-white uppercase transition-transform">P{team.rank || '-'}</div>
                                     </div>
-                                    <div className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center hover:bg-white/20 hover:border-f1-pink/30 transition-all group/stat cursor-pointer relative z-30" onClick={(e) => { e.stopPropagation(); goToStandings(); }}>
+                                    <div className="bg-white/5 rounded-xl p-2 border border-white/5 flex flex-col items-center justify-center hover:bg-white/20 hover:border-f1-pink/30 transition-all group/stat cursor-pointer relative z-30" onClick={(e) => { e.stopPropagation(); if (!editable) goToStandings(); }}>
                                         <div className="flex items-center gap-1.5 mb-1 justify-center w-full">
                                             <BarChart2 size={10} className="text-f1-pink -translate-y-[1px]" />
                                             <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider font-sans not-italic group-hover/stat:text-white transition-colors">Punkte</span>
@@ -309,7 +322,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                                     {teamDrivers.map(d => (
                                         <div 
                                             key={d.id} 
-                                            onClick={(e) => { e.stopPropagation(); goToDriver(d.id); }} 
+                                            onClick={(e) => { e.stopPropagation(); if (!editable) goToDriver(d.id); }} 
                                             className="flex items-center justify-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 hover:bg-white/10 hover:border-f1-pink/30 transition-all group/drivercard"
                                         >
                                             <div className="w-12 h-12 rounded-full border-2 border-f1-card overflow-hidden bg-slate-800 shadow-lg transition-transform shrink-0">
@@ -356,10 +369,15 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
 
             const fontSizeClass = level === 2 ? 'text-3xl md:text-5xl lg:text-[48px]' : 'text-2xl md:text-4xl lg:text-[36px]';
 
+            const isSelected = editable && selectedBlockId === block.clientId;
             return (
                 <div className={`flex items-stretch ${widthClass} ${alignClass}`}>
                     <div className="w-3 bg-f1-pink mr-4 shrink-0 skew-x-[-12deg] mt-[-1px] mb-[9px] shadow-glow" />
-                    <Tag className={`font-display font-black text-white uppercase italic tracking-tighter leading-[1.1] m-0 flex-1 min-w-0 break-words ${fontSizeClass}`} style={{ textAlign: textAlign }}>
+                    <Tag
+                        className={`font-display font-black text-white uppercase italic tracking-tighter leading-[1.1] m-0 flex-1 min-w-0 break-words ${fontSizeClass}`}
+                        style={{ textAlign: textAlign }}
+                        {...(isSelected ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { content: e.currentTarget.innerText }) } : {})}
+                    >
                         {content}
                     </Tag>
                 </div>
@@ -398,24 +416,39 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                     <div className={`py-4 pl-6 border-l-4 border-f1-pink w-full`}>
                         {title && (
                             <div className="mb-4">
-                                <h3 className="w-full font-display font-black text-2xl md:text-3xl uppercase italic tracking-tight text-white leading-tight">
+                                <h3 className="w-full font-display font-black text-2xl md:text-3xl uppercase italic tracking-tight text-white leading-tight"
+                                    {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { title: e.currentTarget.innerText }) } : {})}
+                                >
                                     {title}
                                 </h3>
                             </div>
                         )}
                         <div className={`${sizeConfig.gap}`}>
-                            {(items || []).map((item: string, index: number) => (
-                                <div key={index} className="group flex items-start relative">
-                                    <div className={`shrink-0 mr-4 flex justify-center transition-all duration-200 ${sizeConfig.wrapper} ${ordered ? `items-start ${symbolPt}` : 'items-center'}`}>
-                                        {ordered ? (
-                                            <span className="font-display font-black text-f1-pink italic leading-none transition-all duration-200 text-2xl">{String(index + 1).padStart(2, '0')}</span>
-                                        ) : (
-                                            <div className="w-2 h-2 bg-f1-pink rounded-full shadow-glow transition-all duration-200" />
-                                        )}
+                            {(items || []).map((item: string, index: number) => {
+                                const isSelectedItem = editable && selectedBlockId === block.clientId;
+                                return (
+                                    <div key={index} className="group flex items-start relative">
+                                        <div className={`shrink-0 mr-4 flex justify-center transition-all duration-200 ${sizeConfig.wrapper} ${ordered ? `items-start ${symbolPt}` : 'items-center'}`}>
+                                            {ordered ? (
+                                                <span className="font-display font-black text-f1-pink italic leading-none transition-all duration-200 text-2xl">{String(index + 1).padStart(2, '0')}</span>
+                                            ) : (
+                                                <div className="w-2 h-2 bg-f1-pink rounded-full shadow-glow transition-all duration-200" />
+                                            )}
+                                        </div>
+                                        <div
+                                            className={`w-full text-slate-300 font-display font-bold uppercase italic leading-none break-words ${sizeConfig.text} ${textPt}`}
+                                            {...(isSelectedItem ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => {
+                                                const el = e.currentTarget as HTMLDivElement;
+                                                const newItems = (items || []).slice();
+                                                newItems[index] = el.innerText;
+                                                onUpdateBlock?.(block.clientId, { items: newItems });
+                                            } } : {})}
+                                        >
+                                            {item}
+                                        </div>
                                     </div>
-                                    <div className={`w-full text-slate-300 font-display font-bold uppercase italic leading-none break-words ${sizeConfig.text} ${textPt}`}>{item}</div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 ); 
@@ -425,25 +458,40 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                 <div className={`bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 font-display italic ${widthClass} ${alignClass}`}>
                     {title && (
                         <div className="p-4 md:p-6 pb-2 border-b border-white/5 bg-white/5">
-                            <h3 className="w-full text-white font-display font-black text-2xl md:text-3xl uppercase italic tracking-tight leading-tight">
+                            <h3 className="w-full text-white font-display font-black text-2xl md:text-3xl uppercase italic tracking-tight leading-tight"
+                                {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { title: e.currentTarget.innerText }) } : {})}
+                            >
                                 {title}
                             </h3>
                         </div>
                     )}
                     <div className="h-1 w-full bg-gradient-to-r from-f1-pink to-f1-card"></div>
-                    <div className="divide-y divide-white/5">
-                        {(items || []).map((item: string, index: number) => (
-                            <div key={index} className={`group relative flex items-start hover:bg-white/5 transition-colors duration-300 ${sizeConfig.padding}`}>
-                                <div className={`shrink-0 mr-4 md:mr-6 w-8 md:w-12 text-center flex justify-center transition-all duration-200 ${sizeConfig.wrapper} ${ordered ? `items-start ${symbolPt}` : 'items-center'}`}>
-                                    {ordered ? (
-                                        <span className="font-black leading-none transition-all duration-300 text-white/20 group-hover:text-f1-pink text-3xl">{index + 1}</span>
-                                    ) : (
-                                        <div className="w-3 h-3 bg-f1-pink rounded-full shadow-glow group-hover:scale-125 transition-all duration-300" />
-                                    )}
+                        <div className="divide-y divide-white/5">
+                        {(items || []).map((item: string, index: number) => {
+                            const isSelectedItem = editable && selectedBlockId === block.clientId;
+                            return (
+                                <div key={index} className={`group relative flex items-start hover:bg-white/5 transition-colors duration-300 ${sizeConfig.padding}`}>
+                                    <div className={`shrink-0 mr-4 md:mr-6 w-8 md:w-12 text-center flex justify-center transition-all duration-200 ${sizeConfig.wrapper} ${ordered ? `items-start ${symbolPt}` : 'items-center'}`}>
+                                        {ordered ? (
+                                            <span className="font-black leading-none transition-all duration-300 text-white/20 group-hover:text-f1-pink text-3xl">{index + 1}</span>
+                                        ) : (
+                                            <div className="w-3 h-3 bg-f1-pink rounded-full shadow-glow group-hover:scale-125 transition-all duration-300" />
+                                        )}
+                                    </div>
+                                    <div
+                                        className={`w-full text-white font-bold uppercase tracking-wide leading-none break-words ${sizeConfig.text} ${textPt}`}
+                                        {...(isSelectedItem ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => {
+                                            const el = e.currentTarget as HTMLDivElement;
+                                            const newItems = (items || []).slice();
+                                            newItems[index] = el.innerText;
+                                            onUpdateBlock?.(block.clientId, { items: newItems });
+                                        } } : {})}
+                                    >
+                                        {item}
+                                    </div>
                                 </div>
-                                <div className={`w-full text-white font-bold uppercase tracking-wide leading-none break-words ${sizeConfig.text} ${textPt}`}>{item}</div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             );
@@ -463,16 +511,23 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
 
             const alignClass = isCard ? ({ 'left': 'mr-auto', 'center': 'mx-auto', 'right': 'ml-auto' }[align as string] || 'mx-auto') : '';
             
+            const isSelected = editable && selectedBlockId === block.clientId;
             if (style === 'simple') { 
                 return (
                     <div className={`w-full border-l-4 border-f1-pink pl-6 py-4`}>
-                        <blockquote className={`font-display font-black italic text-white uppercase leading-none break-words ${textSizeClass}`}>
-                            {block.attributes?.content}
-                        </blockquote>
+                            <blockquote className={`font-display font-black italic text-white uppercase leading-none break-words ${textSizeClass}`}>
+                                {isSelected ? (
+                                    <span contentEditable suppressContentEditableWarning onInput={(e: any) => onUpdateBlock?.(block.clientId, { content: e.currentTarget.innerText })}>{block.attributes?.content}</span>
+                                ) : (
+                                    block.attributes?.content
+                                )}
+                            </blockquote>
                         {(block.attributes?.citation) && (
                             <div className="flex items-center mt-3">
                                 <div className="h-0.5 w-8 bg-f1-pink mr-3"></div>
-                                <cite className="font-display font-bold uppercase tracking-widest text-slate-400 not-italic text-lg">
+                                <cite className="font-display font-bold uppercase tracking-widest text-slate-400 not-italic text-lg"
+                                    {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { citation: e.currentTarget.innerText }) } : {})}
+                                >
                                     {block.attributes.citation}
                                 </cite>
                             </div>
@@ -487,12 +542,16 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                         <Quote className="absolute -top-6 -left-6 text-white/5 transform rotate-12 scale-150 pointer-events-none" size={120} />
                         <div className="relative z-10 flex flex-col">
                             <blockquote className={`font-display font-black italic text-white uppercase leading-[0.9] tracking-tight text-center break-words ${textSizeClass}`}>
-                                "{block.attributes?.content}"
+                                "{isSelected ? (
+                                    <span contentEditable suppressContentEditableWarning onInput={(e: any) => onUpdateBlock?.(block.clientId, { content: e.currentTarget.innerText })}>{block.attributes?.content}</span>
+                                ) : (
+                                    block.attributes?.content
+                                )}"
                             </blockquote>
                             {(block.attributes?.citation) && (
                                 <div className="mt-8 flex flex-col items-center justify-center">
                                     <div className="h-1 w-12 bg-f1-pink rounded-full mb-3 shadow-glow"></div>
-                                    <cite className="font-display font-bold uppercase tracking-[0.2em] text-white/60 not-italic text-sm md:text-xl text-center">
+                                    <cite className="font-display font-bold uppercase tracking-[0.2em] text-white/60 not-italic text-sm md:text-xl text-center" {...(isSelected ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { citation: e.currentTarget.innerText }) } : {})}>
                                         {block.attributes.citation}
                                     </cite>
                                 </div>
@@ -520,7 +579,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                     <figure className="font-display italic w-full block mx-auto text-center">
                         <div className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/10 group cursor-zoom-in w-full">
                             <div className="relative bg-f1-dark/50" style={containerStyle}>
-                                <img src={url} alt={alt || ''} className={`block transition-opacity duration-500 opacity-100 group-hover:opacity-90 ${isCustomRatio ? 'absolute inset-0 h-full w-full' : 'w-full'}`} style={imgStyles} loading="lazy" onClick={() => openLightbox(url, alt, credits)} />
+                                <img src={url} alt={alt || ''} className={`block transition-opacity duration-500 opacity-100 group-hover:opacity-90 ${isCustomRatio ? 'absolute inset-0 h-full w-full' : 'w-full'}`} style={imgStyles} loading="lazy" onClick={() => { if (!editable) openLightbox(url, alt, credits); }} />
                                 {credits && (
                                     <div className="absolute bottom-3 left-4 z-20 pointer-events-none">
                                         <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/50 drop-shadow-md font-sans">
@@ -542,8 +601,10 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
         }
 
         case 'custom/gallery': {
-            const galleryImages = (block.attributes?.images || []).map((img: any) => typeof img === 'string' ? { url: img, credit: '', alt: '', crop: true, align: 'center' } : img);
+            const images = block.attributes?.images || [];
+            const galleryImages = images.map((img: any) => typeof img === 'string' ? { url: img, credit: '', alt: '', crop: true, align: 'center' } : img);
             const { columns = 2, aspectRatio: gridAspectRatio = 'auto', crop = true, caption: globalCaption } = block.attributes;
+            const isSelected = editable && selectedBlockId === block.clientId;
             
             const gridWidthClass = 'w-full';
             const gridAlignClass = 'mx-auto';
@@ -559,13 +620,18 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                                         const itemStyle: React.CSSProperties = { width: '100%', height: '100%', objectFit: crop ? 'cover' : 'contain' };
                                         if (gridAspectRatio && gridAspectRatio !== 'auto') itemStyle.aspectRatio = gridAspectRatio.replace(':', ' / ');
                                         return (
-                                            <div key={i} className="flex flex-col group cursor-zoom-in" onClick={() => openLightbox(img.url, img.alt || globalCaption, img.credit)}>
+                                            <div key={i} className={`flex flex-col group ${isSelected ? '' : 'cursor-zoom-in'}`} onClick={() => { if (!editable) openLightbox(img.url, img.alt || globalCaption, img.credit); }}>
                                                 <div className="bg-neutral-800 rounded-xl overflow-hidden border border-white/10 shadow-lg flex flex-col h-full hover:border-f1-pink/20 transition-colors">
                                                     <div className="relative overflow-hidden w-full h-full">
                                                         <img src={img.url} alt={img.alt || ''} style={itemStyle} className="block w-full transition-opacity duration-500 opacity-100 group-hover:opacity-90" loading="lazy" />
                                                         {img.credit && (
-                                                            <div className="absolute bottom-2 left-2 right-2 z-20 pointer-events-none">
-                                                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/50 drop-shadow-md font-sans whitespace-pre-wrap leading-tight block">
+                                                            <div className="absolute bottom-2 left-2 right-2 z-20" onClick={(e) => e.stopPropagation()}>
+                                                                <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/50 drop-shadow-md font-sans whitespace-pre-wrap leading-tight block" {...(isSelected ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => {
+                                                                    const el = e.currentTarget as HTMLSpanElement;
+                                                                    const newImages = (images || []).slice();
+                                                                    newImages[i] = { ...(newImages[i] || {}), credit: el.innerText };
+                                                                    onUpdateBlock?.(block.clientId, { images: newImages });
+                                                                } } : {})}>
                                                                     {img.credit}
                                                                 </span>
                                                             </div>
@@ -579,7 +645,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                             </div>
                             <div className="h-1 w-full bg-gradient-to-r from-f1-pink to-f1-card"></div>
                             {globalCaption && (
-                                <figcaption className="text-left font-display font-bold text-2xl text-white uppercase italic tracking-wide p-4 bg-white/5 whitespace-pre-wrap">
+                                <figcaption className="text-left font-display font-bold text-2xl text-white uppercase italic tracking-wide p-4 bg-white/5 whitespace-pre-wrap" {...(isSelected ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { caption: e.currentTarget.innerText }) } : {})}>
                                     {globalCaption}
                                 </figcaption>
                             )}
@@ -609,7 +675,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                         <div className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative group/slider">
                             <div ref={sliderRef} className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar bg-slate-900" style={getSliderAspectRatio()} onScroll={handleScroll}>
                                 {sliderImages.map((img: any, i: number) => (
-                                    <div key={i} className="min-w-full w-full h-full snap-center relative overflow-hidden cursor-zoom-in group" onClick={() => openLightbox(img.url, img.alt, img.credit)}>
+                                    <div key={i} className="min-w-full w-full h-full snap-center relative overflow-hidden cursor-zoom-in group" onClick={() => { if (!editable) openLightbox(img.url, img.alt, img.credit); }}>
                                         <img src={img.url} alt={img.alt || ''} className="w-full h-full block transition-opacity duration-500 opacity-100 group-hover:opacity-90" style={{ objectFit: img.crop !== false ? 'cover' : 'contain' }} />
                                         {img.credit && (
                                             <div className="absolute bottom-4 left-4 z-20 pointer-events-none">
@@ -621,20 +687,28 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                                     </div>
                                 ))}
                             </div>
-                            {sliderImages.length > 1 && (
+                            {!editable && sliderImages.length > 1 && (
                                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
                                     <div className="bg-f1-pink text-white text-[10px] font-black uppercase px-3 py-1 skew-x-[-12deg] shadow-glow tabular-nums">
                                         SLIDE {currentSlide + 1} / {sliderImages.length}
                                     </div>
                                 </div>
                             )}
-                            <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-4 pointer-events-none z-10 opacity-0 group-hover/slider:opacity-100 transition-opacity">
-                                <button onClick={(e) => { e.stopPropagation(); scrollSlider('prev', sliderImages.length); }} className="w-10 h-10 bg-black/40 hover:bg-f1-pink backdrop-blur-md rounded-full flex items-center justify-center text-white shadow-xl transition-all pointer-events-auto border border-white/20"><ChevronLeft size={24} /></button>
-                                <button onClick={(e) => { e.stopPropagation(); scrollSlider('next', sliderImages.length); }} className="w-10 h-10 bg-black/40 hover:bg-f1-pink backdrop-blur-md rounded-full flex items-center justify-center text-white shadow-xl transition-all pointer-events-auto border border-white/20"><ChevronRight size={24} /></button>
-                            </div>
+                            {!editable && (
+                                <div className="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-4 pointer-events-none z-10 opacity-0 group-hover/slider:opacity-100 transition-opacity">
+                                    <button onClick={(e) => { e.stopPropagation(); if (!editable) scrollSlider('prev', sliderImages.length); }} className="w-10 h-10 bg-black/40 hover:bg-f1-pink backdrop-blur-md rounded-full flex items-center justify-center text-white shadow-xl transition-all pointer-events-auto border border-white/20"><ChevronLeft size={24} /></button>
+                                    <button onClick={(e) => { e.stopPropagation(); if (!editable) scrollSlider('next', sliderImages.length); }} className="w-10 h-10 bg-black/40 hover:bg-f1-pink backdrop-blur-md rounded-full flex items-center justify-center text-white shadow-xl transition-all pointer-events-auto border border-white/20"><ChevronRight size={24} /></button>
+                                </div>
+                            )}
                             <div className="relative z-20 h-1 w-full bg-gradient-to-r from-f1-pink to-f1-card"></div>
                             {currentImage && currentImage.alt && (
-                                <figcaption key={`caption-${currentSlide}`} className="relative z-20 text-left font-display font-bold text-2xl text-white uppercase italic tracking-wide p-4 bg-white/5 whitespace-pre-wrap animate-in fade-in duration-300">
+                                <figcaption key={`caption-${currentSlide}`} className="relative z-20 text-left font-display font-bold text-2xl text-white uppercase italic tracking-wide p-4 bg-white/5 whitespace-pre-wrap animate-in fade-in duration-300" {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => {
+                                    const el = e.currentTarget as HTMLDivElement;
+                                    const original = block.attributes?.images || [];
+                                    const newImages = original.map((it: any) => ({ ...(typeof it === 'string' ? { url: it } : it) }));
+                                    newImages[currentSlide] = { ...(newImages[currentSlide] || {}), alt: el.innerText };
+                                    onUpdateBlock?.(block.clientId, { images: newImages });
+                                } } : {})}>
                                     {currentImage.alt}
                                 </figcaption>
                             )}
@@ -644,6 +718,244 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
             );
         }
 
+        case 'custom/youtube': {
+            const { id, blockSize = 'medium', align = 'center' } = block.attributes;
+            const sizeClass = {
+                'small': 'max-w-sm',
+                'medium': 'max-w-xl',
+                'large': 'max-w-full'
+            }[blockSize as string] || 'max-w-xl';
+
+            const alignClass = {
+                'left': 'mr-auto',
+                'center': 'mx-auto',
+                'right': 'ml-auto'
+            }[align as string] || 'mx-auto';
+
+            const origin = typeof window !== 'undefined' ? window.location.origin : '';
+
+            return (
+                <div className={`w-full ${sizeClass} ${alignClass}`}>
+                    {id ? (
+                        <div className="aspect-video bg-black rounded-2xl overflow-hidden relative shadow-sm border border-white/5">
+                            <iframe
+                                className="w-full h-full pointer-events-none"
+                                src={`https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&origin=${origin}`}
+                                frameBorder="0"
+                                title="YouTube"
+                                referrerPolicy="no-referrer"
+                                allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            />
+                        </div>
+                    ) : (
+                        <div className="aspect-video bg-slate-800 rounded-2xl flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-white/5">
+                            <Camera size={32} className="mb-2" />
+                            <span className="text-xs font-bold uppercase">Video hinzufügen</span>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        case 'custom/spotify': {
+            const { url, blockSize = 'medium', align = 'center' } = block.attributes;
+            const sizeClass = { 'small': 'max-w-md', 'medium': 'max-w-2xl', 'large': 'max-w-4xl' }[blockSize as string] || 'max-w-2xl';
+            const alignClass = { 'left': 'mr-auto', 'center': 'mx-auto', 'right': 'ml-auto' }[align as string] || 'mx-auto';
+
+            return (
+                <div className={`w-full ${sizeClass} ${alignClass}`}>
+                    {url ? (
+                        <div className="rounded-2xl overflow-hidden shadow-sm border border-white/5 bg-white">
+                            <iframe
+                                src={url}
+                                width="100%"
+                                height="152"
+                                frameBorder="0"
+                                allow="encrypted-media"
+                                loading="lazy"
+                                className="pointer-events-none"
+                            />
+                        </div>
+                    ) : (
+                        <div className="p-8 bg-slate-800 border-2 border-dashed border-white/5 rounded-2xl text-center flex flex-col items-center justify-center text-slate-400">
+                            <Music size={32} className="mb-2 text-green-400" />
+                            <span className="text-xs font-bold uppercase">Spotify hinzufügen</span>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        case 'f1/standings': {
+            const { type = 'drivers', style = 'card', blockSize = 'medium', align = 'center' } = block.attributes;
+            const list = type === 'drivers'
+                ? [...drivers].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 5)
+                : [...teams].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 5);
+
+            const isCard = style === 'card';
+            const sizeClass = isCard ? ({
+                'small': 'max-w-md',
+                'medium': 'max-w-2xl',
+                'full': 'w-full'
+            }[blockSize as string] || 'max-w-2xl') : 'w-full';
+
+            const alignClass = isCard ? ({
+                'left': 'mr-auto',
+                'center': 'mx-auto',
+                'right': 'ml-auto'
+            }[align as string] || 'mx-auto') : '';
+
+            if (!isCard) {
+                return (
+                    <div className="w-full border-l-4 border-f1-pink pl-6 py-2 font-display italic">
+                        <div className="flex items-center mb-4 not-italic">
+                            <BarChart2 size={18} className="text-f1-pink mr-2" />
+                            <h4 className="text-2xl font-black text-slate-900 uppercase italic leading-none tracking-tight">
+                                {type === 'drivers' ? 'Fahrerwertung' : 'Teamwertung'} Top 5
+                            </h4>
+                        </div>
+                        <div className="space-y-1">
+                            {list.map((entry, idx) => (
+                                <div key={entry.id} className="flex items-center justify-between py-1 border-b border-slate-100 last:border-0 cursor-pointer" onClick={() => { if (!editable) { if (type === 'drivers') goToDriver((entry as any).id); else goToTeam((entry as any).id); } }}>
+                                    <div className="flex items-center space-x-3">
+                                        <span className="text-lg font-black text-slate-300 w-4">{idx + 1}</span>
+                                        <span className="text-xl font-bold text-slate-800 uppercase tracking-tighter">
+                                            {type === 'drivers' ? (entry as any).lastName : entry.name}
+                                        </span>
+                                    </div>
+                                    <span className="text-xl font-black text-f1-pink">{entry.points}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`w-full ${sizeClass} ${alignClass} font-display italic`}>
+                    <div className="bg-f1-card rounded-2xl overflow-hidden border border-white/5 shadow-xl">
+                        <div className="p-4 bg-white/10 border-b border-white/5 flex justify-between items-center not-italic">
+                            <div className="flex items-center text-white text-lg font-black uppercase tracking-tight">
+                                <Trophy size={18} className="mr-2 text-f1-pink" />
+                                {type === 'drivers' ? 'Championship Standings' : 'Constructors Standings'}
+                            </div>
+                            <div className="text-[10px] font-bold text-white/40 uppercase">Saison 2026</div>
+                        </div>
+                        <div className="divide-y divide-white/5">
+                            {list.map((entry, idx) => (
+                                <div key={entry.id} className="px-6 py-3 flex items-center justify-between group hover:bg-white/5 transition-colors cursor-pointer" onClick={() => { if (!editable) { if (type === 'drivers') goToDriver((entry as any).id); else goToTeam((entry as any).id); } }}>
+                                    <div className="flex items-center space-x-6">
+                                        <span className={`text-2xl font-black ${idx === 0 ? 'text-yellow-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-white/20'}`}>
+                                            {idx + 1}
+                                        </span>
+                                        <div className="flex items-center space-x-4">
+                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10 border border-white/10 shrink-0">
+                                                {((entry as any).image || (entry as any).logo) && <img src={(entry as any).image || (entry as any).logo} className="w-full h-full object-cover" alt="" />}
+                                            </div>
+                                            <div>
+                                                <div className="text-2xl font-black text-white uppercase leading-none tracking-tighter group-hover:text-f1-pink transition-colors">
+                                                    {type === 'drivers' ? (entry as any).lastName : entry.name}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-2xl font-black text-white bg-white/5 px-3 py-0.5 rounded border border-white/5 min-w-[50px] text-center">
+                                            {entry.points}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        case 'f1/calendar': {
+            const { limit = 3, blockSize = 'medium', align = 'center', style = 'card' } = block.attributes;
+            const upcomingRaces = races.filter((r: Race) => r.status !== 'completed').slice(0, limit);
+
+            const isCard = style === 'card';
+            const sizeClass = isCard ? ({
+                'small': 'max-w-md',
+                'medium': 'max-w-2xl',
+                'full': 'w-full'
+            }[blockSize as string] || 'max-w-2xl') : 'w-full';
+
+            const alignClass = isCard ? ({
+                'left': 'mr-auto',
+                'center': 'mx-auto',
+                'right': 'ml-auto'
+            }[align as string] || 'mx-auto') : '';
+
+            if (style === 'simple') {
+                return (
+                    <div className="w-full border-l-4 border-f1-pink pl-6 py-2 bg-white/50 font-sans">
+                        <div className="flex items-center mb-4">
+                            <Calendar size={18} className="text-f1-pink mr-2" />
+                            <h4 className="font-display font-bold text-2xl uppercase italic text-slate-900 tracking-tight">Rennkalender Vorschau</h4>
+                        </div>
+                        <div className="space-y-4">
+                            {upcomingRaces.map((race: Race) => (
+                                <div key={race.id} className="flex items-center justify-between border-b border-slate-100 last:border-0 pb-3 last:pb-0 cursor-pointer" onClick={() => { if (!editable) goToCalendar(); }}>
+                                    <div className="flex items-center space-x-3">
+                                        <div>
+                                            <div className="font-display font-bold text-xl uppercase italic text-slate-800 leading-none">{race.country} GP</div>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase mt-1">Runde {race.round}</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-f1-pink font-display font-bold text-lg leading-none">
+                                            {new Date(race.sessions?.race).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 uppercase mt-1">
+                                            {new Date(race.sessions?.race).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`w-full ${sizeClass} ${alignClass}`}>
+                    <div className="bg-f1-card rounded-2xl overflow-hidden border border-white/5 font-display italic">
+                        <div className="p-4 bg-white/10 flex justify-between items-center border-b border-white/5">
+                            <div className="flex items-center text-white text-lg font-black uppercase tracking-tight">
+                                <Calendar size={18} className="mr-2 text-f1-pink" /> Rennkalender Vorschau
+                            </div>
+                            <div className="text-[10px] font-bold text-white/40 uppercase not-italic">Saison 2026</div>
+                        </div>
+                        <div className="divide-y divide-white/5">
+                            {upcomingRaces.map((race: Race) => (
+                                <div key={race.id} className="p-4 flex items-center justify-between group hover:bg-white/5 transition-colors cursor-pointer" onClick={() => { if (!editable) goToCalendar(); }}>
+                                    <div className="flex items-center space-x-4">
+                                        <div className="text-xl font-black text-white/20 w-8">R{race.round}</div>
+                                        <div>
+                                            <div className="text-xl font-bold text-white uppercase leading-none tracking-tight">{race.country} GP</div>
+                                            <div className="text-[10px] text-slate-400 uppercase not-italic mt-1">
+                                                {new Date(race.sessions?.race).toLocaleDateString('de-DE')} • {race.city}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-f1-pink text-xl font-black uppercase tracking-tighter">
+                                            {new Date(race.sessions?.race).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {upcomingRaces.length === 0 && (
+                                <div className="p-8 text-center text-white/30 text-xs italic">Keine anstehenden Rennen gefunden.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
         case 'custom/details': {
             const { blockSize = 'full', align = 'left', style = 'card', textSize = 'large' } = block.attributes;
             const isCard = style === 'card';
@@ -651,8 +963,33 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
             const alignClass = isCard ? ({ 'left': 'mr-auto', 'center': 'mx-auto', 'right': 'ml-auto' }[align as string] || 'mr-auto') : '';
             const contentTextSize = textSize === 'small' ? 'text-base md:text-lg' : 'text-xl md:text-2xl';
             const contentPadding = textSize === 'small' ? 'px-4 py-4 md:px-6' : 'px-4 py-4 md:p-6';
-            if (!isCard) { return (<details className={`group border-l-4 border-f1-pink pl-6 py-3 w-full`} open={block.attributes?.defaultOpen}><summary className="cursor-pointer list-none flex items-center justify-between hover:opacity-70 transition-all select-none"><span className="font-display font-black text-2xl md:text-3xl italic uppercase text-white tracking-tight –leading-none break-words">{block.attributes?.summary}</span><ChevronDown size={24} className="text-slate-500 transition-transform duration-300 group-open:rotate-180" /></summary><div className={`py-4 text-slate-400 leading-relaxed font-display font-bold uppercase tracking-wide break-words ${contentTextSize}`}>{block.attributes?.content}</div></details>); }
-            return (<details className={`group bg-f1-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden ${widthClass} ${alignClass}`} open={block.attributes?.defaultOpen}><summary className="cursor-pointer list-none block bg-white/5 transition-colors hover:bg-white/10 select-none p-0"><div className="flex items-center justify-between p-4 md:p-6 pb-2"><span className="flex-1 font-display font-black text-2xl md:text-3xl italic uppercase text-white tracking-tight –leading-none break-words">{block.attributes?.summary}</span><ChevronDown size={28} className="text-white/50 ml-4 transition-transform duration-300 group-open:rotate-180 group-open:text-f1-pink" /></div><div className="h-1 w-full bg-gradient-to-r from-f1-pink to-f1-card"></div></summary><div className={`${contentPadding} bg-f1-card/50 text-white/80 leading-relaxed font-display font-bold uppercase tracking-wide break-words ${contentTextSize}`}>{block.attributes?.content}</div></details>);
+            if (!isCard) { 
+                return (
+                    <details className={`group border-l-4 border-f1-pink pl-6 py-3 w-full`} open={block.attributes?.defaultOpen}>
+                        <summary className="cursor-pointer list-none flex items-center justify-between hover:opacity-70 transition-all select-none">
+                            <span className="font-display font-black text-2xl md:text-3xl italic uppercase text-white tracking-tight –leading-none break-words" {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { summary: e.currentTarget.innerText }) } : {})}>{block.attributes?.summary}</span>
+                            <ChevronDown size={24} className="text-slate-500 transition-transform duration-300 group-open:rotate-180" />
+                        </summary>
+                        <div className={`py-4 text-slate-400 leading-relaxed font-display font-bold uppercase tracking-wide break-words ${contentTextSize}`} {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { content: e.currentTarget.innerHTML }) } : {})}>
+                            {block.attributes?.content}
+                        </div>
+                    </details>
+                );
+            }
+            return (
+                <details className={`group bg-f1-card rounded-2xl border border-white/5 shadow-2xl overflow-hidden ${widthClass} ${alignClass}`} open={block.attributes?.defaultOpen}>
+                    <summary className="cursor-pointer list-none block bg-white/5 transition-colors hover:bg-white/10 select-none p-0">
+                        <div className="flex items-center justify-between p-4 md:p-6 pb-2">
+                            <span className="flex-1 font-display font-black text-2xl md:text-3xl italic uppercase text-white tracking-tight –leading-none break-words" {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { summary: e.currentTarget.innerText }) } : {})}>{block.attributes?.summary}</span>
+                            <ChevronDown size={28} className="text-white/50 ml-4 transition-transform duration-300 group-open:rotate-180 group-open:text-f1-pink" />
+                        </div>
+                        <div className="h-1 w-full bg-gradient-to-r from-f1-pink to-f1-card"></div>
+                    </summary>
+                    <div className={`${contentPadding} bg-f1-card/50 text-white/80 leading-relaxed font-display font-bold uppercase tracking-wide break-words ${contentTextSize}`} {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { content: e.currentTarget.innerHTML }) } : {})}>
+                        {block.attributes?.content}
+                    </div>
+                </details>
+            );
         }
 
         case 'custom/table': {
@@ -663,8 +1000,71 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
             const simplePadding = textSize === 'large' ? 'p-3' : 'p-2';
             const widthClass = isCard ? ({ 'small': 'w-full md:w-1/3', 'medium': 'w-full md:w-2/3', 'large': 'w-full md:w-5/6', 'full': 'w-full' }[blockSize as string] || 'w-full') : 'w-full';
             const alignClass = isCard ? ({ 'left': 'mr-auto', 'center': 'mx-auto', 'right': 'ml-auto' }[align as string] || 'mx-auto') : '';
-            if (!isCard) { return (<div className={`overflow-x-auto bg-transparent border-l-4 border-f1-pink pl-4 py-2 w-full`}>{title && (<div className="mb-4"><h3 className="w-full font-display font-black text-3xl uppercase italic tracking-tight text-white">{title}</h3></div>)}<table className={`w-full text-left border-collapse ${fixedWidth ? 'table-fixed' : 'table-auto'}`}><thead><tr className="border-b-2 border-white/20">{headers.map((h: string, i: number) => (<th key={i} className={`${simplePadding} font-display font-black text-2xl uppercase italic tracking-tight text-white`}>{h}</th>))}</tr></thead><tbody className="divide-y divide-white/10">{rows.map((row: string[], ri: number) => (<tr key={ri}>{row.map((cell: string, ci: number) => (<td key={ci} className={`${simplePadding} align-top`}><div className={`w-full font-display font-bold uppercase text-slate-300 ${cellTextSize}`}>{cell}</div></td>))}</tr>))}</tbody></table></div>); }
-            return (<div className={`bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 font-display italic tracking-wide ${widthClass} ${alignClass}`}>{title && (<><div className="p-6 pb-2 border-b border-white/5 bg-white/5"><h3 className="w-full text-white font-display font-black text-3xl uppercase italic tracking-tight">{title}</h3></div><div className="h-1 w-full bg-gradient-to-r from-f1-pink to-f1-card"></div></>)}<div className="overflow-x-auto"><table className={`w-full text-left border-collapse ${fixedWidth ? 'table-fixed' : 'table-auto'}`}><thead><tr className="bg-white/5 border-b border-white/5">{headers.map((h: string, i: number) => (<th key={i} className={`${cardPadding} min-w-[120px] border-r border-white/5 last:border-0 font-display font-black text-3xl uppercase italic tracking-tight text-white`}>{h}</th>))}</tr></thead><tbody className="divide-y divide-white/5">{rows.map((row: string[], ri: number) => (<tr key={ri} className="group hover:bg-white/5 transition-colors">{row.map((cell: string, ci: number) => (<td key={ci} className={`${cardPadding} align-top border-r border-white/5 last:border-0`}><div className={`w-full font-display font-bold uppercase text-white/80 ${cellTextSize}`}>{cell}</div></td>))}</tr>))}</tbody></table></div></div>);
+            if (!isCard) {
+                return (
+                    <div className={`overflow-x-auto bg-transparent border-l-4 border-f1-pink pl-4 py-2 w-full`}>
+                        {title && (
+                            <div className="mb-4">
+                                <h3 className="w-full font-display font-black text-3xl uppercase italic tracking-tight text-white" {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { title: e.currentTarget.innerText }) } : {})}>{title}</h3>
+                            </div>
+                        )}
+                        <table className={`w-full text-left border-collapse ${fixedWidth ? 'table-fixed' : 'table-auto'}`}>
+                            <thead>
+                                <tr className="border-b-2 border-white/20">
+                                    {headers.map((h: string, i: number) => (
+                                        <th key={i} className={`${simplePadding} font-display font-black text-2xl uppercase italic tracking-tight text-white`} {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => {
+                                            const newHeaders = [...headers]; newHeaders[i] = (e.currentTarget.innerText || ''); onUpdateBlock?.(block.clientId, { headers: newHeaders });
+                                        } } : {})}>{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/10">
+                                {rows.map((row: string[], ri: number) => (
+                                    <tr key={ri}>
+                                        {row.map((cell: string, ci: number) => (
+                                            <td key={ci} className={`${simplePadding} align-top`}><div className={`w-full font-display font-bold uppercase text-slate-300 ${cellTextSize}`} {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => {
+                                                const newRows = rows.map(r => [...r]); newRows[ri][ci] = e.currentTarget.innerText; onUpdateBlock?.(block.clientId, { rows: newRows });
+                                            } } : {})}>{cell}</div></td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                );
+            }
+            return (
+                <div className={`bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 font-display italic tracking-wide ${widthClass} ${alignClass}`}>
+                    {title && (
+                        <>
+                            <div className="p-6 pb-2 border-b border-white/5 bg-white/5">
+                                <h3 className="w-full text-white font-display font-black text-3xl uppercase italic tracking-tight" {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { title: e.currentTarget.innerText }) } : {})}>{title}</h3>
+                            </div>
+                            <div className="h-1 w-full bg-gradient-to-r from-f1-pink to-f1-card"></div>
+                        </>
+                    )}
+                    <div className="overflow-x-auto">
+                        <table className={`w-full text-left border-collapse ${fixedWidth ? 'table-fixed' : 'table-auto'}`}>
+                            <thead>
+                                <tr className="bg-white/5 border-b border-white/5">
+                                    {headers.map((h: string, i: number) => (
+                                        <th key={i} className={`${cardPadding} min-w-[120px] border-r border-white/5 last:border-0 font-display font-black text-3xl uppercase italic tracking-tight text-white`} {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => { const newHeaders = [...headers]; newHeaders[i] = e.currentTarget.innerText; onUpdateBlock?.(block.clientId, { headers: newHeaders }); } } : {})}>{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5">
+                                {rows.map((row: string[], ri: number) => (
+                                    <tr key={ri} className="group hover:bg-white/5 transition-colors">
+                                        {row.map((cell: string, ci: number) => (
+                                            <td key={ci} className={`${cardPadding} align-top border-r border-white/5 last:border-0`}><div className={`w-full font-display font-bold uppercase text-white/80 ${cellTextSize}`} {...(editable && selectedBlockId === block.clientId ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => { const newRows = rows.map(r => [...r]); newRows[ri][ci] = e.currentTarget.innerText; onUpdateBlock?.(block.clientId, { rows: newRows }); } } : {})}>{cell}</div></td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
         }
         
         case 'custom/separator': {
@@ -681,8 +1081,9 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
             const isCard = style === 'card';
             const widthClass = isCard ? ({ 'small': 'w-full md:w-1/3', 'medium': 'w-full md:w-2/3', 'large': 'w-full md:w-5/6', 'full': 'w-full' }[blockSize as string] || 'w-full') : 'w-full';
             const alignClass = isCard ? ({ 'left': 'mr-auto', 'center': 'mx-auto', 'right': 'ml-auto' }[align as string] || 'mx-auto') : '';
-            if (!isCard) { return (<div className="w-full border-l-4 border-f1-pink pl-6 py-4 font-display italic"><div className="flex items-center mb-2"><div className="bg-f1-pink text-white text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-widest mr-3 font-sans">{author || 'AUTOR'}</div></div><div className="text-xl md:text-2xl font-bold text-white leading-tight uppercase">{content}</div></div>); }
-            return (<div className={`bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 font-display italic ${widthClass} ${alignClass} group/comment`}><div className="p-6 pb-2 border-b border-white/5 bg-white/5 flex items-center justify-between"><div className="flex items-center text-white"><User size={20} className="text-f1-pink mr-3 mb-1 shrink-0 -translate-y-[2px]" /><span className="font-black text-2xl uppercase italic tracking-tight">{author || 'AUTOR'}</span></div></div><div className="h-1 w-full bg-gradient-to-r from-f1-pink to-f1-card"></div><div className="p-6 relative"><div className="relative z-10 w-full text-white/90 font-bold text-xl md:text-2xl uppercase tracking-wide leading-relaxed">{content}</div></div></div>);
+            const isSelected = editable && selectedBlockId === block.clientId;
+            if (!isCard) { return (<div className="w-full border-l-4 border-f1-pink pl-6 py-4 font-display italic"><div className="flex items-center mb-2"><div className="bg-f1-pink text-white text-[9px] font-black uppercase px-2 py-0.5 rounded tracking-widest mr-3 font-sans" {...(isSelected ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { author: e.currentTarget.innerText }) } : {})}>{author || 'AUTOR'}</div></div><div className="text-xl md:text-2xl font-bold text-white leading-tight uppercase" {...(isSelected ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { content: e.currentTarget.innerText }) } : {})}>{content}</div></div>); }
+            return (<div className={`bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 font-display italic ${widthClass} ${alignClass} group/comment`}><div className="p-6 pb-2 border-b border-white/5 bg-white/5 flex items-center justify-between"><div className="flex items-center text-white"><User size={20} className="text-f1-pink mr-3 mb-1 shrink-0 -translate-y-[2px]" /><span className="font-black text-2xl uppercase italic tracking-tight" {...(isSelected ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { author: e.currentTarget.innerText }) } : {})}>{author || 'AUTOR'}</span></div></div><div className="h-1 w-full bg-gradient-to-r from-f1-pink to-f1-card"></div><div className="p-6 relative"><div className="relative z-10 w-full text-white/90 font-bold text-xl md:text-2xl uppercase tracking-wide leading-relaxed" {...(isSelected ? { contentEditable: true, suppressContentEditableWarning: true, onInput: (e: any) => onUpdateBlock?.(block.clientId, { content: e.currentTarget.innerText }) } : {})}>{content}</div></div></div>);
         }
 
         case 'f1/title-watch': {
@@ -746,7 +1147,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                 <div className="w-full font-display italic">
                     <div 
                         className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5 relative cursor-pointer group"
-                        onClick={() => goToCalendar()}
+                        onClick={() => { if (!editable) goToCalendar(); }}
                     >
                         <div className="p-6 pb-2 border-b border-white/5 bg-white/5 flex items-center justify-between relative z-20">
                              <div className="flex items-center gap-4">
@@ -823,7 +1224,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block }) => {
                                                 key={key} 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    goToCalendar();
+                                                    if (!editable) goToCalendar();
                                                 }}
                                                 className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer group/session ${
                                                     isRace 

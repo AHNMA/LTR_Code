@@ -2,12 +2,14 @@ import React from 'react';
 import { Trophy, BarChart2, Flag } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import { useData } from '../../../contexts/DataContext';
 import { getFlagUrl } from '../../../constants';
 import { DottedGlowBackground } from '../../ui/DottedGlowBackground';
 
 export const DriverEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     const { drivers, teams } = useData();
+    const { updateBlock, selectedBlockId } = useEditor();
     const { id } = block.attributes;
     
     const driver = drivers.find(d => d.id === id);
@@ -20,6 +22,7 @@ export const DriverEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
 
     return (
         <div className={`w-full ${sizeClass} ${alignClass} font-display italic`}>
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
             {/* Removed "group" to disable hover effects in editor */}
             <div className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5">
                 

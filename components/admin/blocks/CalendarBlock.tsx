@@ -3,11 +3,13 @@ import React from 'react';
 import { Calendar, MapPin, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import { useData } from '../../../contexts/DataContext';
 import { getFlagUrl } from '../../../constants';
 
 export const CalendarEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     const { races } = useData();
+    const { updateBlock, selectedBlockId } = useEditor();
     const { limit = 3, blockSize = 'medium', align = 'center', style = 'card' } = block.attributes;
     const upcomingRaces = races.filter(r => r.status !== 'completed').slice(0, limit);
     
@@ -26,7 +28,9 @@ export const CalendarEditor: React.FC<{ block: ContentBlock }> = ({ block }) => 
 
     if (style === 'simple') {
         return (
-            <div className="w-full border-l-4 border-f1-pink pl-6 py-2 bg-white/50 font-sans">
+            <div>
+                <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+                <div className="w-full border-l-4 border-f1-pink pl-6 py-2 bg-white/50 font-sans">
                 <div className="flex items-center mb-4">
                     <Calendar size={18} className="text-f1-pink mr-2" />
                     <h4 className="font-display font-bold text-2xl uppercase italic text-slate-900 tracking-tight">Rennkalender Vorschau</h4>
@@ -51,6 +55,7 @@ export const CalendarEditor: React.FC<{ block: ContentBlock }> = ({ block }) => 
                             </div>
                         </div>
                     ))}
+                </div>
                 </div>
             </div>
         );

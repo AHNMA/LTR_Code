@@ -2,12 +2,14 @@ import React from 'react';
 import { Trophy, BarChart2, Flag, Zap, Cpu, Users } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import { useData } from '../../../contexts/DataContext';
 import { getFlagUrl } from '../../../constants';
 import { DottedGlowBackground } from '../../ui/DottedGlowBackground';
 
 export const TeamEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     const { teams, drivers } = useData();
+    const { updateBlock, selectedBlockId } = useEditor();
     const { id } = block.attributes;
     
     const team = teams.find(t => t.id === id);
@@ -18,6 +20,7 @@ export const TeamEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
 
     return (
         <div className="w-full mx-auto font-display italic">
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
             {/* Removed "group" to disable hover state in editor */}
             <div className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/5">
                 

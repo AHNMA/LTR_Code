@@ -3,6 +3,7 @@ import { Sparkles } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
 import AutoResizeTextarea from '../editor/AutoResizeTextarea';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import { GoogleGenAI } from "@google/genai";
 import RichTextToolbar from '../editor/RichTextToolbar';
 
@@ -33,6 +34,7 @@ export const ParagraphEditor: React.FC<{ block: ContentBlock }> = ({ block }) =>
 
     return (
         <div style={{ textAlign: block.attributes.textAlign }} className="relative group/para">
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
             <div className={`transition-all duration-200 ${isSelected ? 'opacity-100 translate-y-0 mb-1' : 'opacity-0 -translate-y-2 h-0 overflow-hidden pointer-events-none'}`}>
                 {isSelected && (
                     <RichTextToolbar 

@@ -3,20 +3,25 @@ import React from 'react';
 import { Layout, Minus, Circle, Flag, Zap, CircleDot } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 
 export const SeparatorEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     const style = block.attributes?.style || 'tech';
+    const { updateBlock, selectedBlockId } = useEditor();
 
     // 1. STYLE: TECH (Broadcast Style)
     if (style === 'tech') {
         return (
-            <div className="flex items-center justify-center w-full py-6 select-none group/sep">
-               <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent w-full"></div>
-               <div className="mx-6 flex space-x-1 shrink-0">
-                   <div className="w-2 h-6 bg-f1-pink -skew-x-[20deg] shadow-glow group-hover/sep:scale-110 transition-transform duration-300"></div>
-                   <div className="w-1 h-6 bg-white/20 -skew-x-[20deg] group-hover/sep:bg-white/40 transition-colors"></div>
-               </div>
-               <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent w-full"></div>
+            <div>
+                <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+                <div className="flex items-center justify-center w-full py-6 select-none group/sep">
+                   <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent w-full"></div>
+                   <div className="mx-6 flex space-x-1 shrink-0">
+                       <div className="w-2 h-6 bg-f1-pink -skew-x-[20deg] shadow-glow group-hover/sep:scale-110 transition-transform duration-300"></div>
+                       <div className="w-1 h-6 bg-white/20 -skew-x-[20deg] group-hover/sep:bg-white/40 transition-colors"></div>
+                   </div>
+                   <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent w-full"></div>
+                </div>
             </div>
         );
     }

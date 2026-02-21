@@ -2,6 +2,7 @@ import React from 'react';
 import { Youtube, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 
 // --- Utils ---
 const extractYoutubeId = (input: string) => {
@@ -40,42 +41,11 @@ const extractYoutubeId = (input: string) => {
 
 // --- Editor Component ---
 export const YouTubeEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { id, blockSize = 'medium', align = 'center' } = block.attributes;
-    
-    const sizeClass = {
-        'small': 'max-w-sm',
-        'medium': 'max-w-xl',
-        'large': 'max-w-full'
-    }[blockSize as string] || 'max-w-xl';
-
-    const alignClass = {
-        'left': 'mr-auto',
-        'center': 'mx-auto',
-        'right': 'ml-auto'
-    }[align as string] || 'mx-auto';
-
-    // Calculate origin for sandbox compatibility
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const { updateBlock, selectedBlockId } = useEditor();
 
     return (
-        <div className={`w-full ${sizeClass} ${alignClass}`}>
-            {id ? (
-                <div className="aspect-video bg-black rounded-2xl overflow-hidden relative shadow-sm border border-slate-200">
-                    <iframe 
-                        className="w-full h-full pointer-events-none" 
-                        src={`https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1&origin=${origin}`} 
-                        frameBorder="0" 
-                        title="YouTube Preview"
-                        referrerPolicy="no-referrer"
-                        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    ></iframe>
-                </div>
-            ) : (
-                <div className="aspect-video bg-slate-100 rounded-2xl flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200">
-                    <Youtube size={32} className="mb-2" />
-                    <span className="text-xs font-bold uppercase">Video hinzufügen</span>
-                </div>
-            )}
+        <div>
+            <BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} />
         </div>
     );
 };

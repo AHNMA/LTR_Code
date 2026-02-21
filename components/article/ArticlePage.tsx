@@ -1,8 +1,10 @@
 import React from 'react';
+import ArticleShell from './ArticleShell';
 import { usePosts } from '../../contexts/PostContext';
 import { useNavigation } from '../../contexts/NavigationContext';
 import BlockRenderer from './BlockRenderer';
 import { Clock, Calendar, Share2, MessageSquare, ChevronRight, Facebook, Twitter, Linkedin, Copy, Camera, RefreshCw } from 'lucide-react';
+import { useViewMode } from '../../contexts/ViewModeContext';
 
 const ArticlePage: React.FC = () => {
   const { getPost } = usePosts();
@@ -19,13 +21,21 @@ const ArticlePage: React.FC = () => {
 
   // Normalize sections
   const activeSections = Array.isArray(post.section) ? post.section : [post.section];
+    const { viewportWidth } = useViewMode();
+    const simulatedStyle: React.CSSProperties = viewportWidth === '100%' ? {} : { width: typeof viewportWidth === 'number' ? `${viewportWidth}px` : '100%', margin: '0 auto' };
 
-  return (
-    <article className="bg-f1-dark min-h-screen pb-20 font-sans text-slate-300">
-      <div className="fixed top-0 left-0 h-1 bg-f1-pink z-[60] w-full origin-left animate-[grow_1s_ease-out] shadow-glow"></div>
+    return (
+        <ArticleShell>
+                <article className="bg-f1-dark min-h-screen pb-20 font-sans text-slate-300">
+            {/* Apply simulated viewport width to the article inner wrapper so editor preview and frontend match */}
+            {/* If viewportWidth === '100%' we keep full responsive layout */}
+      
+    <div className="fixed top-0 left-0 h-1 bg-f1-pink z-[60] w-full origin-left animate-[grow_1s_ease-out] shadow-glow"></div>
+
+    <div style={simulatedStyle}>
 
       {/* Breadcrumbs */}
-      <div className="container mx-auto px-4 py-4 flex items-center text-[10px] text-slate-500 uppercase font-bold tracking-widest">
+    <div className="container mx-auto px-4 py-4 flex items-center text-[10px] text-slate-500 uppercase font-bold tracking-widest">
         <button onClick={goToHome} className="hover:text-f1-pink transition-colors">Home</button>
         <ChevronRight size={10} className="mx-2" />
         <span className="text-f1-pink">News</span>
@@ -77,7 +87,9 @@ const ArticlePage: React.FC = () => {
                 </div>
             </div>
         </div>
-      </header>
+    </header>
+
+    </div>
 
       {/* Hero Media */}
       <div className="container mx-auto px-0 md:px-4 lg:max-w-6xl mb-12">
@@ -229,8 +241,9 @@ const ArticlePage: React.FC = () => {
                 <span className="text-[10px] font-bold mt-1 uppercase">{post.commentCount}</span>
             </button>
       </div>
-    </article>
-  );
+        </article>
+        </ArticleShell>
+    );
 };
 
 export default ArticlePage;

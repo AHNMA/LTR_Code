@@ -3,6 +3,7 @@ import React from 'react';
 import { Layers, Image as ImageIcon, Crop, AlignLeft, AlignCenter, AlignRight, GripVertical, X, Plus, Camera } from 'lucide-react';
 import { ContentBlock } from '../../../types';
 import { useEditor } from '../editor/EditorContext';
+import BlockRenderer from '../../../components/article/BlockRenderer';
 import AutoResizeTextarea from '../editor/AutoResizeTextarea';
 
 // --- Utils ---
@@ -25,7 +26,7 @@ export const normalizeGalleryImages = (images: any[]) => {
 
 // --- Editor Component ---
 export const GalleryEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
-    const { updateBlock, setMediaPickerTarget } = useEditor();
+    const { updateBlock, setMediaPickerTarget, selectedBlockId } = useEditor();
     
     const columns = block.attributes?.columns || 2;
     const rawImages = block.attributes?.images || [];
@@ -70,7 +71,9 @@ export const GalleryEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
     });
 
     return (
-        <div className="w-full font-display italic transition-all duration-500">
+        <div>
+            <div className="mb-6"><BlockRenderer block={block} editable={true} selectedBlockId={selectedBlockId} onUpdateBlock={updateBlock} /></div>
+            <div className="w-full font-display italic transition-all duration-500">
             
             {/* Main Card Container */}
             <div className="bg-f1-card rounded-2xl overflow-hidden shadow-2xl border border-white/10 group/container">
@@ -160,9 +163,11 @@ export const GalleryEditor: React.FC<{ block: ContentBlock }> = ({ block }) => {
                 </div>
 
             </div>
+            </div>
         </div>
     );
 };
+ 
 
 // --- Inspector Component ---
 export const GalleryInspector: React.FC<{ block: ContentBlock }> = ({ block }) => {
